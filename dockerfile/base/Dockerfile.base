@@ -1,0 +1,19 @@
+# Basic ISO information
+FROM ollama/ollama:latest
+
+# Set using default settings for "apt-get install" pop-up 
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ISO operating commands
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+## separate ollama & python in two Dockerfiles but who cares!?
+## prevent system level python conflict with manuall pip install packages
+RUN mkdir -p /root/.config/pip \
+ && echo "[global]" > /root/.config/pip/pip.conf \
+ && echo "break-system-packages = true" >> /root/.config/pip/pip.conf
+
+# Set container's directory
+WORKDIR /workspace
