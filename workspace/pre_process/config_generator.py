@@ -119,4 +119,4 @@ if __name__ == '__main__':
     parser.add_argument("config_file", help="The name of the output config file.")
     args = parser.parse_args()
 
-    generate_config(args.config_file, args.input_file)
+    generate_config(args.input_file, args.config_file)

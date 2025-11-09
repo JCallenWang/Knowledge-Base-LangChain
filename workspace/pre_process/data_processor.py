@@ -123,7 +123,7 @@ def _load_and_clean_sheet(input_file, sheet_name, header_config):
     
     return df, metadata_string
 
-def _format_records(df, metadata_string, source_file_id):
+def _format_records(df, metadata_string):
     if df.empty:
         return []
 
@@ -141,8 +141,7 @@ def _format_records(df, metadata_string, source_file_id):
                 record[k] = ""
         
         if metadata_string:
-            record['Metadata'] = metadata_string
-        record['SourceFile'] = source_file_id
+            record['ExtraInfo'] = metadata_string
 
     return records
 
@@ -156,10 +155,7 @@ def process_single_sheet(input_file, output_file_path, sheet_name, header_config
         print(f"sheet '{sheet_name}' have empty data after cleaning.")
         return 0
 
-    source_filename_only = os.path.basename(input_file)
-    source_file_id = f"{source_filename_only}-{sheet_name}"
-    
-    records = _format_records(df, metadata_string, source_file_id)
+    records = _format_records(df, metadata_string)
 
     try:
         with open(output_file_path, 'w', encoding='utf-8') as output_stream:
@@ -184,10 +180,7 @@ def process_single_sheet_with_separated_output(input_file, input_file_base, shee
         print(f"sheet '{sheet_name}' have empty data after cleaning.")
         return 0
 
-    source_filename_only = os.path.basename(input_file)
-    source_file_id = f"{source_filename_only}-{sheet_name}"
-
-    records = _format_records(df, metadata_string, source_file_id)
+    records = _format_records(df, metadata_string)
     
     print(f"Saving each row to a separate .jsonl file.")
     for i, record in enumerate(records):
