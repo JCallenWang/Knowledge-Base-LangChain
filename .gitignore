@@ -1,4 +1,8 @@
-# untrack source data
+# untrack source file
 *.xlsx
 *.json
 *.jsonl
+
+# untrack intermediate file
+*.db
+*.txt
