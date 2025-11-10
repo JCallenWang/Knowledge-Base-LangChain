@@ -7,10 +7,9 @@ import sqlite3
 import hashlib
 import os
 
-CHUNK_SIZE = 10
-DATA_NAME = './preprocess/result/clean_random_p1_事務機.jsonl'
-DATABASE_NAME = 'xlsx_jsonl_data_p1.db'
-HASH_FILE_PATH = 'xlsx_jsonl_data_p1_hash.txt'
+DATA_NAME = './pre_process/result/clean_random_p1_事務機.jsonl'
+DATABASE_NAME = './xlsx_jsonl_data_p1.db'
+HASH_FILE_NAME = 'xlsx_jsonl_data_p1_hash.txt'
     
 
 def needs_update(data, hash_file_path):
@@ -47,7 +46,7 @@ def load_processed_data(file_path: str) -> list[Document]:
         )
     return readable_docs
 
-def create_and_populate_db(file_path: str, db_name: str):
+def create_and_populate_db(file_path: str, db_name: str, hash_name: str):
     """
     Creates a SQLite database and populates it with data from a list of Document objects.
 
@@ -60,13 +59,13 @@ def create_and_populate_db(file_path: str, db_name: str):
         print("No documents to process.")
         return
     
-    update_required, new_hash = needs_update(docs, HASH_FILE_PATH)
+    update_required, new_hash = needs_update(docs, hash_name)
     if not update_required:
         print("---loading same database, no need to update---")
         return
     else:
         print("---data update required, remove existing database---")
-        with open(HASH_FILE_PATH, "w") as f:
+        with open(hash_name, "w") as f:
             f.write(new_hash)
         if os.path.exists(db_name):
             os.remove(db_name)
@@ -105,17 +104,9 @@ def create_and_populate_db(file_path: str, db_name: str):
     conn.close()
     print(f"Successfully inserted {len(docs)} records into '{table_name}'.")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("jsonl_file_path", type=str, help="Path to the input JSONL file.")
-
-    args = parser.parse_args()
-    create_and_populate_db(args.jsonl_file_path, DATABASE_NAME)
-
-    conn = sqlite3.connect(DATABASE_NAME)
-    cursor = conn.cursor()
-    sql_commands = "SELECT COUNT(*) FROM data;"
-    cursor.execute(sql_commands)
-    count = cursor.fetchone()[0]
-    print(f"Total records in 'data' table: {count}")
-
+    #parser = argparse.ArgumentParser()
+    #parser.add_argument("jsonl_file_path", type=str, help="Path to the input JSONL file.")
+    #args = parser.parse_args()
+    create_and_populate_db(DATA_NAME, DATABASE_NAME, HASH_FILE_NAME)
