@@ -7,11 +7,6 @@ import sqlite3
 import hashlib
 import os
 
-DATA_NAME = './pre_process/result/clean_random_p1_事務機.jsonl'
-DATABASE_NAME = './xlsx_jsonl_data_p1.db'
-HASH_FILE_NAME = 'xlsx_jsonl_data_p1_hash.txt'
-    
-
 def needs_update(data, hash_file_path):
     hasher = hashlib.md5()
     hasher.update(str(data).encode('utf-8'))
@@ -106,7 +101,10 @@ def create_and_populate_db(file_path: str, db_name: str, hash_name: str):
 
 
 if __name__ == "__main__":
-    #parser = argparse.ArgumentParser()
-    #parser.add_argument("jsonl_file_path", type=str, help="Path to the input JSONL file.")
-    #args = parser.parse_args()
-    create_and_populate_db(DATA_NAME, DATABASE_NAME, HASH_FILE_NAME)
+    parser = argparse.ArgumentParser(description="Create and populate a SQLite database from a JSONL file.")
+    parser.add_argument("jsonl_file_path", type=str, help="Path to the input JSONL file.")
+    parser.add_argument("db_name", type=str, help="Name of the SQLite database file to create.")
+    parser.add_argument("hash_name", type=str, help="Name of the file to store the data hash.")
+    args = parser.parse_args()
+
+    create_and_populate_db(args.jsonl_file_path, args.db_name, args.hash_name)
