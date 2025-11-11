@@ -9,3 +9,6 @@
 
 # untrack dev dir
 /dockerfile/dev
+
+# untrack __pycache__
+/workspace/__pycache__/
