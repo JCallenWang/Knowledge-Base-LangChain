@@ -196,7 +196,7 @@ def process_single_sheet_with_separated_output(input_file, input_file_base, shee
     return len(records)
 
 
-def main(config_file, output_file_dir, separated_output=False, ):
+def process_data_from_config(config_file, output_file_dir, separated_output=False, ):
     print(f"--- start processing: loading config '{config_file}' ---")
     
     try:
@@ -221,7 +221,7 @@ def main(config_file, output_file_dir, separated_output=False, ):
     input_file_base = os.path.splitext(os.path.basename(input_file))[0]
     
     print(f"source file: {input_file}")
-    print(f"total sheet count: {len(sheet_names)}, output as separated .txt file")
+    print(f"total sheet count: {len(sheet_names)}, output as .txt file")
     
     try:
         for sheet_name in sheet_names:
@@ -240,9 +240,8 @@ def main(config_file, output_file_dir, separated_output=False, ):
                     input_file, input_file_base, sheet_name, header_config
                 )
                 total_records += records_count
-            break
         print("\n" + "=" * 50)
-        print(f"process complete! all sheets have been converted into separated .txt file.")
+        print(f"process complete! all sheets have been converted into .txt file.")
         print(f"Total process count: {total_records}")
         print("=" * 50)
         
@@ -252,12 +251,12 @@ def main(config_file, output_file_dir, separated_output=False, ):
         print(f"Error: unexpected error occurred: {e}")
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Process Excel data based on a configuration file.")
-    parser.add_argument("config_file", help="The name of the configuration file (e.g., config.json).")
-    parser.add_argument("output_file_dir", help="The directory where the output files will be saved.")
-    parser.add_argument("--separated_output", type=lambda x: x.lower() == 'true', default=False,
-                        help="Set to 'True' to output each row as a separate .txt file, 'False' for combined output per sheet.")
-    args = parser.parse_args()
-
-    main(args.config_file, args.output_file_dir, args.separated_output)
+#if __name__ == '__main__':
+#    parser = argparse.ArgumentParser(description="Process Excel data based on a configuration file.")
+#    parser.add_argument("config_file", help="The name of the configuration file (e.g., config.json).")
+#    parser.add_argument("output_file_dir", help="The directory where the output files will be saved.")
+#    parser.add_argument("--separated_output", type=lambda x: x.lower() == 'true', default=False,
+#                        help="Set to 'True' to output each row as a separate .txt file, 'False' for combined output per sheet.")
+#    args = parser.parse_args()
+#
+#    process_data_from_config(args.config_file, args.output_file_dir, args.separated_output)

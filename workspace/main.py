@@ -1,9 +1,21 @@
 import os
 import sys
-import hashlib
 import shutil
-import subprocess
+import hashlib
+import argparse
 
+from data_preprocessing.config_generator import generate_config
+from data_preprocessing.data_processor import process_data_from_config
+from data_initiation.sql_db_generator import create_and_populate_db
+
+from agents.sql_agent import start_sql_agent
+
+SCHEMA_DESCRIPTION = """
+    請注意 :
+    - '姓氏' 欄位實際代表「單位／處室名稱」，並非人名，請以單位為統計依據，若為空值，請在統計時獨立歸類為「未知單位」。
+    - '彩色頁面' 欄位代表列印的彩色頁面數量。
+    - '黑白頁面' 欄位代表列印的黑白頁面數量。
+    """  
 
 def get_file_hash(file_path):
     """Computes the SHA256 hash of a file."""
@@ -20,70 +32,59 @@ def get_file_hash(file_path):
         print(f"An error occurred while hashing the file: {e}")
         sys.exit(1)
 
-
-def run_script(command):
-    """Runs a script as a subprocess and checks for errors."""
-    try:
-        print(f"\n--- Running command: {' '.join(command)} ---\n")
-        process = subprocess.run(command, check=True, text=True, capture_output=True)
-        print(process.stdout)
-        if process.stderr:
-            print("--- Stderr ---")
-            print(process.stderr)
-        print(f"\n--- Command finished successfully ---")
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing {' '.join(e.cmd)}.")
-        print(f"Return code: {e.returncode}")
-        print("--- Stdout ---")
-        print(e.stdout)
-        print("--- Stderr ---")
-        print(e.stderr)
-        sys.exit(1)
-
-
-def main():
-    """Main function to orchestrate the data processing workflow."""
-    # 1. Get source file from user
-    source_file = input("Please enter the path to the source XLSX file: ").strip()
+def xlsx_to_sql_init(source_file):
     if not os.path.exists(source_file) or not source_file.endswith('.xlsx'):
         print(f"Error: File '{source_file}' is not a valid .xlsx file.")
         sys.exit(1)
 
-    # 2. Create a hash-based directory to store artifacts
     file_hash = get_file_hash(source_file)
     base_name = os.path.splitext(os.path.basename(source_file))[0]
-    output_dir = f"./{base_name}_{file_hash[:8]}"
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"Artifacts will be saved in: '{output_dir}'")
+    root_output_dir = f"./{base_name}_{file_hash[:8]}"
+    os.makedirs(root_output_dir, exist_ok=True)
 
-    # Copy source file to the new directory
-    staged_source_file = os.path.join(output_dir, os.path.basename(source_file))
+    # Define subdirectories for better organization
+    source_files_dir = os.path.join(root_output_dir, "source")
+    config_files_dir = os.path.join(root_output_dir, "config")
+    processed_data_dir = os.path.join(root_output_dir, "processed_data")
+    database_dir = os.path.join(root_output_dir, "database")
+
+    # Create subdirectories
+    os.makedirs(source_files_dir, exist_ok=True)
+    os.makedirs(config_files_dir, exist_ok=True)
+    os.makedirs(processed_data_dir, exist_ok=True)
+    os.makedirs(database_dir, exist_ok=True)
+
+    config_file = os.path.join(config_files_dir, f"{base_name}_config.json")
+    db_file = os.path.join(database_dir, f"{base_name}.db")
+
+    if os.path.exists(db_file):
+        print(f"database file already exists: '{db_file}'.")
+        return db_file
+    else:
+        print(f"Artifacts will be saved in: '{root_output_dir}'")
+
+
+    # Update file paths to use the new subdirectories
+    staged_source_file = os.path.join(source_files_dir, os.path.basename(source_file))
     shutil.copy(source_file, staged_source_file)
 
-    # Define file paths
-    config_file = os.path.join(output_dir, f"{base_name}_config.json")
-    jsonl_file = os.path.join(output_dir, f"{base_name}_事務機.jsonl")
-    db_file = os.path.join(output_dir, f"{base_name}.db")
-    db_hash_file = os.path.join(output_dir, f"{base_name}_hash.txt")
-
-    # 3. Run config_generator.py
     print("\nStep 1: Generating configuration file...")
-    config_command = ["python", "pre_process/config_generator.py", staged_source_file, config_file]
-    # This script requires user input, so we run it differently to allow interaction.
-    subprocess.run(config_command)
+    generate_config(staged_source_file, config_file)
 
-    # 4. Run data_processor.py
     print("\nStep 2: Processing data and converting to JSONL...")
-    process_command = ["python", "pre_process/data_processor.py", config_file, output_dir]
-    run_script(process_command)
+    process_data_from_config(config_file, processed_data_dir)
 
-    # 5. Run db_sql_init.py
-    print("\nStep 3: Initializing SQL database from JSONL file...")
-    db_init_command = ["python", "db_sql_init.py", jsonl_file, db_file, db_hash_file]
-    run_script(db_init_command)
+    print("\nStep 3: Initializing SQL database from JSONL files...")
+    create_and_populate_db(processed_data_dir, db_file)
 
-    print(f"\nWorkflow complete! All artifacts are located in '{output_dir}'.")
-
+    print(f"\nWorkflow complete! All artifacts and description file are located in '{root_output_dir}'.")
+    return db_file
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Convert .xlsx into sql database.")
+    parser = argparse.ArgumentParser(description="Process an .xlsx file to create a SQL database and then start an interactive SQL agent.")
+    parser.add_argument("input_file", help="The name of the input source file (.xlsx).")
+    args = parser.parse_args()
+    db_path = xlsx_to_sql_init(args.input_file)
+
+    start_sql_agent(db_path, SCHEMA_DESCRIPTION)

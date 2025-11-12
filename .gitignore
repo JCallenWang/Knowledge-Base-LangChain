@@ -11,4 +11,4 @@
 /dockerfile/dev
 
 # untrack __pycache__
-/workspace/__pycache__/
+__pycache__/

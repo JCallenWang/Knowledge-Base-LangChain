@@ -107,16 +107,15 @@ def generate_config(input_file, output_config_file):
         
         print("\n" + "=" * 50)
         print(f"config generate successfully! please check '{output_config_file}'.")
-        print(f"continue next step with 'data_processor.py'.")
         print("=" * 50)
 
     except Exception as e:
         print(f"Error while writing config file:{e}")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Generate a configuration file for data processing.")
-    parser.add_argument("input_file", help="The name of the input source file (.xlsx).")
-    parser.add_argument("config_file", help="The name of the output config file.")
-    args = parser.parse_args()
-
-    generate_config(args.input_file, args.config_file)
+#if __name__ == '__main__':
+#    parser = argparse.ArgumentParser(description="Generate a configuration file for data processing.")
+#    parser.add_argument("input_file", help="The name of the input source file (.xlsx).")
+#    parser.add_argument("config_file", help="The name of the output config file.")
+#    args = parser.parse_args()
+#
+#    generate_config(args.input_file, args.config_file)

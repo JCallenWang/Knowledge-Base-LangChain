@@ -14,7 +14,7 @@ class PromptFactory:
 
     @classmethod
     def create_sql_generation_prompt(cls) -> ChatPromptTemplate:
-        system_message = '請根據提供的SQL資料庫結構與範例，生成SQL的查詢語法: {db_schema}'
+        system_message = '請根據提供的SQL資料庫結構與範例，生成SQL的查詢語法: {db_schema}{schema_description}'
         user_message = ('使用者提問: "{input}"。\n請根據以下規則生成SQL查詢語法: '
                         '只生成SQL語法，不要添加額外解釋，不要用Markdown語法包裝SQL語法')
         return cls._create_prompt(system_message, user_message)
