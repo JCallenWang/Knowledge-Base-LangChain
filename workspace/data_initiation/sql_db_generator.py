@@ -7,7 +7,7 @@ import sqlite3
 import os
 import glob
 
-def load_processed_data(file_path: str) -> list[Document]:
+def _load_processed_data(file_path: str) -> list[Document]:
     loader = JSONLoader(
         file_path=file_path,
         jq_schema='.', # Process each JSONL object (line)
@@ -94,7 +94,7 @@ def _create_dbs_from_jsonl_files(input_dir: str, output_dir: str):
         conn = sqlite3.connect(db_name)
         cursor = conn.cursor()
 
-        docs = load_processed_data(file_path)
+        docs = _load_processed_data(file_path)
         inserted_count = _populate_db_from_docs(cursor, docs, base_name)
         total_records += inserted_count
 

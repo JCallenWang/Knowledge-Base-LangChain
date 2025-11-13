@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import hashlib
+import glob
 import argparse
 
 from data_preprocessing.config_generator import generate_config
@@ -10,7 +11,7 @@ from data_initiation.sql_db_generator import initialize_database
 
 from agents.sql_agent import start_sql_agent
 
-SCHEMA_DESCRIPTION = """
+ADDITIONAL_DESCRIPTION = """
     請注意 :
     - '姓氏' 欄位實際代表「單位／處室名稱」，並非人名，請以單位為統計依據，若為空值，請在統計時獨立歸類為「未知單位」。
     - '彩色頁面' 欄位代表列印的彩色頁面數量。
@@ -55,11 +56,10 @@ def xlsx_to_sql_init(source_file):
     os.makedirs(database_dir, exist_ok=True)
 
     config_file = os.path.join(config_files_dir, f"{base_name}_config.json")
-    db_file = os.path.join(database_dir, f"{base_name}.db")
 
-    if os.path.exists(db_file):
-        print(f"database file already exists at '{db_file}'.")
-        return db_file
+    if os.path.isdir(database_dir) and glob.glob(os.path.join(database_dir, '*.db')):
+        print(f"Database files already exist in '{database_dir}'. Skipping generation.")
+        return database_dir
     else:
         print(f"Artifacts will be saved in: '{root_output_dir}'")
 
@@ -86,6 +86,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process an .xlsx file to create a SQL database and then start an interactive SQL agent.")
     parser.add_argument("input_file", help="The name of the input source file (.xlsx).")
     args = parser.parse_args()
-    db_output_path = xlsx_to_sql_init(args.input_file)
 
-    #start_sql_agent(db_output_path, SCHEMA_DESCRIPTION)
+    db_output_path = xlsx_to_sql_init(args.input_file)
+    start_sql_agent(db_output_path, ADDITIONAL_DESCRIPTION)

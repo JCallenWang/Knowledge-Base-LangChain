@@ -37,3 +37,12 @@ class PromptFactory:
                     "- 查詢結果: {result}\n\n"
                     "請提供簡潔有、具有說明性的回應。")
         return ChatPromptTemplate.from_template(template)
+
+    @classmethod
+    def create_db_selection_prompt(cls) -> ChatPromptTemplate:
+        system_message = ('你是一個善於將使用者問題連結到正確資料庫的專家。'
+                        '根據使用者問題和可用的資料庫名稱列表，你必須選擇最相關的單一資料庫。')
+        user_message = ('使用者問題: "{input}"\n'
+                        '可用資料庫: {db_names}\n'
+                        '請僅回應列表中最相關的資料庫名稱，不要添加額外解釋，不要用Markdown語法。')
+        return cls._create_prompt(system_message, user_message)
