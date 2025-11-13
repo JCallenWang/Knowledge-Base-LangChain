@@ -29,48 +29,23 @@ def load_processed_data(file_path: str) -> list[Document]:
         )
     return readable_docs
 
-def create_and_populate_db(input_dir: str, db_name: str):
-    """
-    Creates a SQLite database and populates it with data from a list of Document objects.
+def _populate_db_from_docs(cursor, docs, table_name):
+    """Helper function to create a table and insert documents into it."""
+    if not docs:
+        print(f"No documents to process for table '{table_name}'.")
+        return 0
 
-    Args:
-        input_dir (str): The directory containing the .jsonl files.
-        db_name (str): The name of the SQLite database file to create.
-    """
-    jsonl_files = glob.glob(os.path.join(input_dir, '*.jsonl'))
-    if not jsonl_files:
-        print(f"No .jsonl files found in '{input_dir}'.")
-        return
-    
-    # Create a hash of all file contents to check for updates
-    if os.path.exists(db_name):
-        print(f"---Existing database '{db_name}' found, removing it before recreation.---")
-        os.remove(db_name)
-
-    # Establish a connection to the SQLite database
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-
-    total_records = 0
-    for file_path in jsonl_files:
-        print(f"\nProcessing file: {file_path}")
-        docs = load_processed_data(file_path)
-        if not docs:
-            print(f"No documents to process in '{file_path}'.")
-            continue
-
+    try:
         # Use the first document to create the table schema
         first_doc_content = json.loads(docs[0].page_content)
         columns = first_doc_content.keys()
         sql_columns = [f'"{col}" TEXT' for col in columns]
 
-        # Derive table name from the JSONL filename
-        table_name = os.path.splitext(os.path.basename(file_path))[0]
         create_table_query = f"CREATE TABLE IF NOT EXISTS \"{table_name}\" ({', '.join(sql_columns)})"
         cursor.execute(create_table_query)
-        print(f"Table '{table_name}' is ready in database '{db_name}'.")
+        print(f"Table '{table_name}' is ready.")
 
-        # Insert data from all documents in the current file
+        # Insert data from all documents
         for doc in docs:
             try:
                 record = json.loads(doc.page_content)
@@ -80,13 +55,69 @@ def create_and_populate_db(input_dir: str, db_name: str):
                 cursor.execute(insert_query, values)
             except json.JSONDecodeError:
                 print(f"Warning: Skipping a document due to JSON decoding error: {doc.page_content}")
-        total_records += len(docs)
+        
         print(f"Successfully inserted {len(docs)} records into '{table_name}'.")
+        return len(docs)
 
-    conn.commit()
-    conn.close()
-    print(f"\nDatabase population complete. Total records inserted: {total_records}.")
+    except (json.JSONDecodeError, IndexError) as e:
+        print(f"Error processing documents for table '{table_name}': {e}")
+        return 0
+    except sqlite3.Error as e:
+        print(f"An SQLite error occurred while processing table '{table_name}': {e}")
+        return 0
 
+def _create_dbs_from_jsonl_files(input_dir: str, output_dir: str):
+    """
+    Creates a separate SQLite database for each .jsonl file in a directory.
+
+    Args:
+        input_dir (str): The directory containing the .jsonl files.
+        output_dir (str): The directory where the .db files will be saved.
+    """
+    jsonl_files = glob.glob(os.path.join(input_dir, '*.jsonl'))
+    if not jsonl_files:
+        print(f"No .jsonl files found in '{input_dir}'.")
+        return
+
+    os.makedirs(output_dir, exist_ok=True)
+    total_records = 0
+
+    for file_path in jsonl_files:
+        print(f"\nProcessing file: {file_path}")
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        db_name = os.path.join(output_dir, f"{base_name}.db")
+
+        if os.path.exists(db_name):
+            print(f"---Existing database '{db_name}' found, removing it before recreation.---")
+            os.remove(db_name)
+
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+
+        docs = load_processed_data(file_path)
+        inserted_count = _populate_db_from_docs(cursor, docs, base_name)
+        total_records += inserted_count
+
+        conn.commit()
+        conn.close()
+        print(f"Database '{db_name}' created successfully.")
+
+    print(f"\nAll databases created. Total records inserted across all databases: {total_records}.")
+
+def initialize_database(input_dir: str, output_dir: str):
+    """
+    Initializes the database(s) from .jsonl files in the input directory.
+    This function creates a separate .db file for each .jsonl file found.
+
+    Args:
+        input_dir (str): The directory containing the .jsonl files.
+        output_dir (str): The directory where the .db files will be saved.
+    """
+    if not glob.glob(os.path.join(input_dir, '*.jsonl')):
+        print("No processed data files found. Skipping database creation.")
+        return
+
+    _create_dbs_from_jsonl_files(input_dir, output_dir)
 
 #if __name__ == "__main__":
 #    parser = argparse.ArgumentParser(description="Create and populate a SQLite database from a JSONL file.")

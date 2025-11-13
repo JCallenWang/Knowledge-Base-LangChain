@@ -6,7 +6,7 @@ import argparse
 
 from data_preprocessing.config_generator import generate_config
 from data_preprocessing.data_processor import process_data_from_config
-from data_initiation.sql_db_generator import create_and_populate_db
+from data_initiation.sql_db_generator import initialize_database
 
 from agents.sql_agent import start_sql_agent
 
@@ -58,7 +58,7 @@ def xlsx_to_sql_init(source_file):
     db_file = os.path.join(database_dir, f"{base_name}.db")
 
     if os.path.exists(db_file):
-        print(f"database file already exists: '{db_file}'.")
+        print(f"database file already exists at '{db_file}'.")
         return db_file
     else:
         print(f"Artifacts will be saved in: '{root_output_dir}'")
@@ -75,16 +75,17 @@ def xlsx_to_sql_init(source_file):
     process_data_from_config(config_file, processed_data_dir)
 
     print("\nStep 3: Initializing SQL database from JSONL files...")
-    create_and_populate_db(processed_data_dir, db_file)
+    # This single function handles all database creation logic.
+    initialize_database(processed_data_dir, database_dir)
 
-    print(f"\nWorkflow complete! All artifacts and description file are located in '{root_output_dir}'.")
-    return db_file
+    print(f"\nWorkflow complete! All artifacts are located in '{root_output_dir}'.")
+    return database_dir
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert .xlsx into sql database.")
     parser = argparse.ArgumentParser(description="Process an .xlsx file to create a SQL database and then start an interactive SQL agent.")
     parser.add_argument("input_file", help="The name of the input source file (.xlsx).")
     args = parser.parse_args()
-    db_path = xlsx_to_sql_init(args.input_file)
+    db_output_path = xlsx_to_sql_init(args.input_file)
 
-    start_sql_agent(db_path, SCHEMA_DESCRIPTION)
+    #start_sql_agent(db_output_path, SCHEMA_DESCRIPTION)

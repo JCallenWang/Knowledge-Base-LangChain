@@ -221,7 +221,7 @@ def process_data_from_config(config_file, output_file_dir, separated_output=Fals
     input_file_base = os.path.splitext(os.path.basename(input_file))[0]
     
     print(f"source file: {input_file}")
-    print(f"total sheet count: {len(sheet_names)}, output as .txt file")
+    print(f"total sheet count: {len(sheet_names)}, output as .jsonl file")
     
     try:
         for sheet_name in sheet_names:
@@ -241,7 +241,7 @@ def process_data_from_config(config_file, output_file_dir, separated_output=Fals
                 )
                 total_records += records_count
         print("\n" + "=" * 50)
-        print(f"process complete! all sheets have been converted into .txt file.")
+        print(f"process complete! all sheets have been converted into .jsonl file.")
         print(f"Total process count: {total_records}")
         print("=" * 50)
         
@@ -256,7 +256,7 @@ def process_data_from_config(config_file, output_file_dir, separated_output=Fals
 #    parser.add_argument("config_file", help="The name of the configuration file (e.g., config.json).")
 #    parser.add_argument("output_file_dir", help="The directory where the output files will be saved.")
 #    parser.add_argument("--separated_output", type=lambda x: x.lower() == 'true', default=False,
-#                        help="Set to 'True' to output each row as a separate .txt file, 'False' for combined output per sheet.")
+#                        help="Set to 'True' to output each row as a separate .jsonl file, 'False' for combined output per sheet.")
 #    args = parser.parse_args()
 #
 #    process_data_from_config(args.config_file, args.output_file_dir, args.separated_output)
