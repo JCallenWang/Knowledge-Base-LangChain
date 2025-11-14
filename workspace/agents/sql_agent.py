@@ -16,7 +16,7 @@ LLM_MODEL = "gemma3:27b"
 def init_model():
     llm = OllamaLLM(
         model = LLM_MODEL,
-        callbacks = [StreamingStdOutCallbackHandler()]
+        #callbacks = [StreamingStdOutCallbackHandler()]
     )
     return llm
 
@@ -65,7 +65,7 @@ def start_sql_agent(db_path: str, additional_description: str):
 
     def get_db_connection(db_file_path: str) -> SQLDatabase:
         if db_file_path not in db_connections:
-            print(f"\nConnecting to database: '{db_file_path}'")
+            #print(f"\nConnecting to database: '{db_file_path}'")
             db_connections[db_file_path] = SQLDatabase.from_uri(
                 f"sqlite:///{db_file_path}",
                 sample_rows_in_table_info=1
@@ -83,7 +83,6 @@ def start_sql_agent(db_path: str, additional_description: str):
 
         for _ in range(SQL_QUERY_TRYING_LIMIT):
             try:
-                print(f"\nparesed sql query:\n{query}\n\n")
                 return db.run(query)
             except (OperationalError, Exception) as e:
                 print("\nEncountered a SQL error. Attempting to correct the query...")
@@ -102,7 +101,7 @@ def start_sql_agent(db_path: str, additional_description: str):
                 })
         return f"Error occurred when executing query: '{query}' with error: {str(e) if 'e' in locals() else 'Unknown error'}"
 
-    def test_query_system(chain, is_multi_db: bool):
+    def start_query_system(chain, is_multi_db: bool):
         while True:
             user_input = input("(Enter 'bye'/'exit' to exit the query system) Enter a question: ") 
             if user_input.lower() in ('bye', 'exit'):
@@ -128,18 +127,22 @@ def start_sql_agent(db_path: str, additional_description: str):
 
     # This is the main chain that processes the user's request.
     db_chain = (
-        RunnablePassthrough.assign(db_path=db_router_chain)
-        | RunnablePassthrough.assign(db=lambda x: get_db_connection(x["db_path"]))
-        | RunnablePassthrough.assign(db_schema=lambda x: x["db"].get_table_info())
+        RunnablePassthrough.assign(db_path=db_router_chain).with_config({"run_name": "Select DB"})
+        | RunnableLambda(lambda x: print(f"\n[Debug] Selected DB Path: {x['db_path']}") or x).with_config({"run_name": "Print DB Path"})
+        | RunnablePassthrough.assign(db=lambda x: get_db_connection(x["db_path"])).with_config({"run_name": "Get DB Connection"})
+        | RunnablePassthrough.assign(db_schema=lambda x: x["db"].get_table_info()).with_config({"run_name": "Fetch DB Schema"})
         | RunnablePassthrough.assign(
             query=(
                 PromptFactory.create_sql_generation_prompt()
                 | llm
             )
-        )
-        | RunnablePassthrough.assign(result=run_sql_query)
-        | PromptFactory.create_answer_generation_prompt()
-        | llm
-    )   
+        ).with_config({"run_name": "Generate SQL Query"})
+        | RunnableLambda(lambda x: print(f"\n[Debug] Generated SQL Query: \n{x['query']}") or x).with_config({"run_name": "Print SQL Query"})
+        | RunnablePassthrough.assign(result=run_sql_query).with_config({"run_name": "Execute SQL Query"})
+        | RunnableLambda(lambda x: print(f"\n[Debug] SQL Query Result: {x['result']}") or x).with_config({"run_name": "Print Query Result"})
+        | PromptFactory.create_answer_generation_prompt().with_config({"run_name": "Generate Final Answer"})
+        | llm # This is the final LLM call
+        | RunnableLambda(lambda x: print(f"\n[Debug] Final LLM Response: {x}") or x).with_config({"run_name": "Print Final Response"})
+    )
 
-    test_query_system(db_chain, is_multi_db=len(db_files) > 1)
+    start_query_system(db_chain, is_multi_db=len(db_files) > 1)
