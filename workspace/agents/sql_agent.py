@@ -3,6 +3,7 @@ from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHan
 from sqlalchemy.exc import OperationalError  
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_community.utilities import SQLDatabase
+import time
 
 import os
 import glob
@@ -109,7 +110,10 @@ def start_sql_agent(db_path: str, additional_description: str):
                 break
 
             if user_input.strip():
-                invoke_params = {'input': user_input, 'schema_description': additional_description}
+                start_time = time.time()
+                invoke_params = {'input': user_input, 
+                                 'schema_description': additional_description,
+                                 'start_time': start_time}
                 if is_multi_db:
                     # Provide the list of db names for the router to choose from
                     invoke_params['db_names'] = [os.path.basename(f) for f in db_files]
@@ -127,22 +131,25 @@ def start_sql_agent(db_path: str, additional_description: str):
 
     # This is the main chain that processes the user's request.
     db_chain = (
-        RunnablePassthrough.assign(db_path=db_router_chain).with_config({"run_name": "Select DB"})
-        | RunnableLambda(lambda x: print(f"\n[Debug] Selected DB Path: {x['db_path']}") or x).with_config({"run_name": "Print DB Path"})
-        | RunnablePassthrough.assign(db=lambda x: get_db_connection(x["db_path"])).with_config({"run_name": "Get DB Connection"})
-        | RunnablePassthrough.assign(db_schema=lambda x: x["db"].get_table_info()).with_config({"run_name": "Fetch DB Schema"})
+        RunnablePassthrough.assign(db_path=db_router_chain)
+        | RunnableLambda(lambda x: print(f"\n[Debug][{time.time() - x['start_time']:.2f}s] Selected DB Path: {x['db_path']}") or x)
+        | RunnablePassthrough.assign(db=lambda x: get_db_connection(x["db_path"]))
+        | RunnablePassthrough.assign(db_schema=lambda x: x["db"].get_table_info())
         | RunnablePassthrough.assign(
             query=(
                 PromptFactory.create_sql_generation_prompt()
                 | llm
             )
-        ).with_config({"run_name": "Generate SQL Query"})
-        | RunnableLambda(lambda x: print(f"\n[Debug] Generated SQL Query: \n{x['query']}") or x).with_config({"run_name": "Print SQL Query"})
-        | RunnablePassthrough.assign(result=run_sql_query).with_config({"run_name": "Execute SQL Query"})
-        | RunnableLambda(lambda x: print(f"\n[Debug] SQL Query Result: {x['result']}") or x).with_config({"run_name": "Print Query Result"})
-        | PromptFactory.create_answer_generation_prompt().with_config({"run_name": "Generate Final Answer"})
-        | llm # This is the final LLM call
-        | RunnableLambda(lambda x: print(f"\n[Debug] Final LLM Response: {x}") or x).with_config({"run_name": "Print Final Response"})
+        )
+        | RunnableLambda(lambda x: print(f"\n[Debug][{time.time() - x['start_time']:.2f}s] Generated SQL Query: \n{x['query']}") or x)
+        | RunnablePassthrough.assign(result=run_sql_query)
+        | RunnableLambda(lambda x: print(f"\n[Debug][{time.time() - x['start_time']:.2f}s] SQL Query Result: {x['result']}") or x)
+        | RunnablePassthrough.assign(
+            final_response=(
+                PromptFactory.create_answer_generation_prompt() | llm
+            )
+        )
+        | RunnableLambda(lambda x: print(f"\n[Debug][{time.time() - x['start_time']:.2f}s] Final LLM Response: {x['final_response']}") or x)
     )
 
     start_query_system(db_chain, is_multi_db=len(db_files) > 1)
