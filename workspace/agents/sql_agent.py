@@ -12,14 +12,26 @@ from typing import Dict, Any
 from .utils_sql import PromptFactory
 
 SQL_QUERY_TRYING_LIMIT = 2
-LLM_MODEL = "gemma3:27b"
+#LLM_MODEL = "gemma3:27b"
+LLM_MODEL = "weitsung50110/llama-3-taiwan:8b-instruct-dpo-q4_K_M"
+#LLM_MODEL = "cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_m"
+
+SQL_LLM = "gemma3:27b"
+#SQL_LLM = "weitsung50110/llama-3-taiwan:8b-instruct-dpo-q4_K_M"
+#SQL_LLM = "cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_m"
+#SQL_LLM = "duckdb-nsql:latest"
 
 def init_model():
     llm = OllamaLLM(
         model = LLM_MODEL,
         #callbacks = [StreamingStdOutCallbackHandler()]
     )
-    return llm
+    sqlm = OllamaLLM(
+        model = SQL_LLM,
+        #callbacks = [StreamingStdOutCallbackHandler()]
+    )
+
+    return llm, sqlm
 
 def check_sql_query(query: str) -> bool:
     if any(keyword in query.upper() for keyword in ["DELETE FROM", "UPDATE", "INSERT INTO", "DROP TABLE", "ALTER TABLE", "CREATE TABLE"]):
@@ -46,7 +58,7 @@ def start_sql_agent(db_path: str, additional_description: str):
         db_path (str): The path to the database file or directory.
         schema_description (str): A description of the database schema.
     """
-    llm = init_model()
+    llm, sqlm = init_model()
 
     if not os.path.exists(db_path):
         print(f"Cannot find database path: {db_path}")
@@ -90,7 +102,7 @@ def start_sql_agent(db_path: str, additional_description: str):
                 
                 correction_chain = (
                     PromptFactory.create_sql_correction_prompt()
-                    | llm
+                    | sqlm
                 )
                 
                 # The correction chain can now access 'llm' from the outer scope
@@ -100,12 +112,14 @@ def start_sql_agent(db_path: str, additional_description: str):
                     "failing_query": query,
                     "error_message": str(e)
                 })
+                print(f"\n[Correcting] Generated SQL Query: \n{query}")
+
         return f"Error occurred when executing query: '{query}' with error: {str(e) if 'e' in locals() else 'Unknown error'}"
 
     def start_query_system(chain, is_multi_db: bool):
         while True:
             user_input = input("(Enter 'bye'/'exit' to exit the query system) Enter a question: ") 
-            if user_input.lower() in ('bye', 'exit'):
+            if user_input.lower() in ('bye', 'exit', 'clear'):
                 print("Thanks for using, bye!")
                 break
 
@@ -138,7 +152,7 @@ def start_sql_agent(db_path: str, additional_description: str):
         | RunnablePassthrough.assign(
             query=(
                 PromptFactory.create_sql_generation_prompt()
-                | llm
+                | sqlm
             )
         )
         | RunnableLambda(lambda x: print(f"\n[Debug][{time.time() - x['start_time']:.2f}s] Generated SQL Query: \n{x['query']}") or x)
