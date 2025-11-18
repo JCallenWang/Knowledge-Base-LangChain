@@ -6,6 +6,7 @@
 # untrack intermediate file
 *.db
 *.txt
+random*
 
 # untrack dev dir
 /dockerfile/dev

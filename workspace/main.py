@@ -40,22 +40,12 @@ def xlsx_to_sql_init(source_file):
 
     file_hash = get_file_hash(source_file)
     base_name = os.path.splitext(os.path.basename(source_file))[0]
-    root_output_dir = f"./{base_name}_{file_hash[:8]}"
-    os.makedirs(root_output_dir, exist_ok=True)
 
-    # Define subdirectories for better organization
+    root_output_dir = f"./{base_name}_{file_hash[:8]}"
     source_files_dir = os.path.join(root_output_dir, "source")
     config_files_dir = os.path.join(root_output_dir, "config")
     processed_data_dir = os.path.join(root_output_dir, "processed_data")
     database_dir = os.path.join(root_output_dir, "database")
-
-    # Create subdirectories
-    os.makedirs(source_files_dir, exist_ok=True)
-    os.makedirs(config_files_dir, exist_ok=True)
-    os.makedirs(processed_data_dir, exist_ok=True)
-    os.makedirs(database_dir, exist_ok=True)
-
-    config_file = os.path.join(config_files_dir, f"{base_name}_config.json")
 
     if os.path.isdir(database_dir) and glob.glob(os.path.join(database_dir, '*.db')):
         print(f"Database files already exist in '{database_dir}'. Skipping generation.")
@@ -63,8 +53,14 @@ def xlsx_to_sql_init(source_file):
     else:
         print(f"Artifacts will be saved in: '{root_output_dir}'")
 
+    os.makedirs(root_output_dir, exist_ok=True)
+    os.makedirs(source_files_dir, exist_ok=True)
+    os.makedirs(config_files_dir, exist_ok=True)
+    os.makedirs(processed_data_dir, exist_ok=True)
+    os.makedirs(database_dir, exist_ok=True)
 
-    # Update file paths to use the new subdirectories
+    config_file = os.path.join(config_files_dir, f"{base_name}_config.json")
+
     staged_source_file = os.path.join(source_files_dir, os.path.basename(source_file))
     shutil.copy(source_file, staged_source_file)
 
@@ -75,7 +71,6 @@ def xlsx_to_sql_init(source_file):
     process_data_from_config(config_file, processed_data_dir)
 
     print("\nStep 3: Initializing SQL database from JSONL files...")
-    # This single function handles all database creation logic.
     initialize_database(processed_data_dir, database_dir)
 
     print(f"\nWorkflow complete! All artifacts are located in '{root_output_dir}'.")

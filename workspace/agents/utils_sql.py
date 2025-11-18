@@ -1,10 +1,22 @@
 from langchain_core.prompts import ChatPromptTemplate  
+from langchain_community.utilities import SQLDatabase
+from dataclasses import dataclass, field
+import time
 
 class PromptFactory:
     """
     A factory class for creating reusable and parameterized ChatPromptTemplates.
     """
 
+    @classmethod
+    def create_db_selection_prompt(cls) -> ChatPromptTemplate:
+        system_message = ('你是一個善於將使用者問題連結到正確資料庫的專家。'
+                        '根據使用者問題和可用的資料庫名稱列表，你必須選擇最相關的單一資料庫。')
+        user_message = ('使用者問題: "{input}"\n'
+                        '可用資料庫: {db_names}\n'
+                        '請僅回應列表中最相關的資料庫名稱，不要添加額外解釋，不要用Markdown語法。')
+        return cls._create_prompt(system_message, user_message)
+    
     @staticmethod
     def _create_prompt(system_message: str, user_message: str) -> ChatPromptTemplate:
         return ChatPromptTemplate.from_messages([
@@ -38,11 +50,20 @@ class PromptFactory:
                     "請提供簡潔有、具有說明性的回應。")
         return ChatPromptTemplate.from_template(template)
 
-    @classmethod
-    def create_db_selection_prompt(cls) -> ChatPromptTemplate:
-        system_message = ('你是一個善於將使用者問題連結到正確資料庫的專家。'
-                        '根據使用者問題和可用的資料庫名稱列表，你必須選擇最相關的單一資料庫。')
-        user_message = ('使用者問題: "{input}"\n'
-                        '可用資料庫: {db_names}\n'
-                        '請僅回應列表中最相關的資料庫名稱，不要添加額外解釋，不要用Markdown語法。')
-        return cls._create_prompt(system_message, user_message)
+@dataclass
+class SQLAgentContext:
+    """A data class to hold the context passed through the SQL agent chain."""
+    # Initial inputs
+    user_input: str
+    schema_description: str
+    start_time: float = field(default_factory=time.time)
+    db_names: list[str] = field(default_factory=list)
+
+    # Fields populated during the chain
+    db_path: str = ""
+    db: SQLDatabase = None
+    db_schema: str = ""
+    query: str = ""
+    result: str = ""
+    final_response: str = ""
+
