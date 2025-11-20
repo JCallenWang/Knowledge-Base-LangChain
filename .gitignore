@@ -1,12 +1,13 @@
 # untrack source file
-*.xlsx
-*.json
-*.jsonl
+/workspace/*.xlsx
+/workspace/*.json
+/workspace/*.jsonl
+/workspace/source*
 
 # untrack intermediate file
-*.db
-*.txt
-random*
+/workspace/*.db
+/workspace/*.txt
+/workspace/random*
 
 # untrack dev dir
 /dockerfile/dev
