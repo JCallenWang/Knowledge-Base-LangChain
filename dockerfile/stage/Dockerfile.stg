@@ -1,0 +1,22 @@
+# Basic ISO information
+FROM ollama/ollama:latest
+
+# Set using default settings for "apt-get install" pop-up 
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ISO operating commands
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+## prevent system level python conflict with manuall pip install packages
+RUN mkdir -p /root/.config/pip \
+ && echo "[global]" > /root/.config/pip/pip.conf \
+ && echo "break-system-packages = true" >> /root/.config/pip/pip.conf
+ 
+# Copy requirements.txt to current directory and install package
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+# Switch to /root/workspace
+WORKDIR /workspace
