@@ -5,8 +5,8 @@ services:
   # service name
   ollama-langchain:
     # image name
-    image: fc-langchain-rag:v0.1.4
-    container_name: fc-rag-dev-v2
+    image: fc-langchain-rag:v0.1.5
+    container_name: fc-rag-dev-v3
     build:
       context: .
       dockerfile: Dockerfile.stg

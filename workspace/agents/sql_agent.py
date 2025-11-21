@@ -12,8 +12,8 @@ from sqlalchemy.exc import OperationalError
 from .utils_sql import PromptFactory, SQLAgentContext
 
 SQL_QUERY_TRYING_LIMIT = 2
-#LLM_MODEL = "gemma3:27b"
-LLM_MODEL = "weitsung50110/llama-3-taiwan:8b-instruct-dpo-q4_K_M"
+LLM_MODEL = "gemma3:27b"
+#LLM_MODEL = "weitsung50110/llama-3-taiwan:8b-instruct-dpo-q4_K_M"
 #LLM_MODEL = "cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_m"
 
 SQL_LLM = "gemma3:27b"
