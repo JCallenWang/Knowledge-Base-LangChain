@@ -20,7 +20,3 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Switch to /root/workspace
 WORKDIR /workspace
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
