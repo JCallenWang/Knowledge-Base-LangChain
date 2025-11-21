@@ -1,41 +1,150 @@
 #!/bin/bash
 
+CONTAINER_NAME="fc-rag-dev-v3"
 REPO_URL="https://github.com/JCallenWang/Knowledge-Base-LangChain.git"
 DIR_NAME="Knowledge-Base-LangChain"
+DOCKER_DIR="dockerfile/stage"
 
-# 1. Clone repo and cd into it
-if [ -d "$DIR_NAME" ]; then
-    echo "Directory '$DIR_NAME' already exists. Skipping clone."
-else
-    echo "Cloning $REPO_URL..."
-    git clone "$REPO_URL"
-fi
+# Helper to navigate to docker directory
+check_and_cd_docker_dir() {
+    if [ -d "$DIR_NAME/$DOCKER_DIR" ]; then
+        cd "$DIR_NAME/$DOCKER_DIR" || return 1
+    elif [ -d "$DOCKER_DIR" ]; then
+        cd "$DOCKER_DIR" || return 1
+    else
+        return 1
+    fi
+}
 
-cd "$DIR_NAME" || { echo "Failed to enter directory $DIR_NAME"; exit 1; }
+first_run() {
+    # 1. Clone repo if not exists
+    if [ -d "$DIR_NAME" ]; then
+        echo "Directory '$DIR_NAME' already exists. Skipping clone."
+    else
+        echo "Cloning $REPO_URL..."
+        git clone "$REPO_URL"
+    fi
 
-# 2. cd dockerfile/stage
-cd dockerfile/stage || { echo "Failed to enter directory dockerfile/stage"; exit 1; }
+    # Navigate to docker directory
+    if ! check_and_cd_docker_dir; then
+        echo "Error: Cannot find docker directory after clone."
+        read -n 1 -s -r -p "Press any key to return to menu..."
+        return
+    fi
 
-# 3. run "docker compose build --no-cache"
-echo "Building docker image..."
-docker compose build --no-cache
+    # 2. Build and Start
+    echo "Building docker image..."
+    docker compose build --no-cache
+    
+    echo "Starting docker container..."
+    docker compose up -d
 
-# 4. run "docker compose up -d"
-echo "Starting docker container..."
-docker compose up -d
+    # 3. Wait for Ollama
+    echo "Waiting for Ollama service to be ready..."
+    until docker exec "$CONTAINER_NAME" ollama list > /dev/null 2>&1; do
+        sleep 2
+    done
 
+    # 4. Pull Model
+    echo "Pulling model gemma3:27b..."
+    docker exec -it "$CONTAINER_NAME" ollama pull gemma3:27b
 
-# Wait for Ollama to be ready
-CONTAINER_NAME="fc-rag-dev-v3"
-echo "Waiting for Ollama service to be ready..."
-until docker exec "$CONTAINER_NAME" ollama list > /dev/null 2>&1; do
-    sleep 2
+    # 5. Enter Container
+    echo "Entering container $CONTAINER_NAME..."
+    docker exec -it "$CONTAINER_NAME" bash
+}
+
+resume_run() {
+    # 1. Check if project directory exists
+    if ! check_and_cd_docker_dir; then
+        echo "Error: Project directory not found."
+        echo "Please select 'First Run' to clone and setup the environment."
+        read -n 1 -s -r -p "Press any key to return to menu..."
+        return
+    fi
+
+    # 2. Check if container exists (running or stopped)
+    if [ -z "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
+        echo "Container $CONTAINER_NAME does not exist. Creating and starting..."
+        docker compose up -d
+    elif [ -z "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "Container $CONTAINER_NAME is stopped. Starting..."
+        docker compose start
+    else
+        echo "Container $CONTAINER_NAME is already running."
+    fi
+
+    # 3. Wait for Ollama
+    echo "Waiting for Ollama service to be ready..."
+    until docker exec "$CONTAINER_NAME" ollama list > /dev/null 2>&1; do
+        sleep 2
+    done
+
+    # 4. Enter
+    echo "Entering container $CONTAINER_NAME..."
+    docker exec -it "$CONTAINER_NAME" bash
+}
+
+stop_container() {
+    # Check if container exists at all
+    if [ -z "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
+        echo "Container $CONTAINER_NAME does not exist."
+        read -n 1 -s -r -p "Press any key to return to menu..."
+        return
+    fi
+
+    echo "Stopping container $CONTAINER_NAME..."
+    docker stop "$CONTAINER_NAME"
+    echo "Container stopped."
+    read -n 1 -s -r -p "Press any key to return to menu..."
+}
+
+# Interactive Menu
+echo -ne "\033[?25l" # Hide cursor
+trap 'echo -ne "\033[?25h"; exit' INT TERM EXIT # Restore cursor on exit
+
+while true; do
+    clear
+    echo "Use UP/DOWN arrows to navigate, ENTER to select."
+    echo
+
+    OPTIONS=(
+        "First Run (Clone, Build, Start, Pull Model, Enter)"
+        "Resume (Start if needed, Enter)"
+        "Stop Container"
+        "Exit"
+    )
+
+    # Default selection if not set
+    if [ -z "$SELECTED" ]; then SELECTED=0; fi
+
+    # Print menu
+    for i in "${!OPTIONS[@]}"; do
+        if [ $i -eq $SELECTED ]; then
+            echo -e "\033[7m> ${OPTIONS[$i]}\033[0m" # Inverse video
+        else
+            echo "  ${OPTIONS[$i]}"
+        fi
+    done
+
+    # Read input
+    read -rsn1 key
+    if [[ $key == $'\x1b' ]]; then
+        read -rsn2 key
+        if [[ $key == "[A" ]]; then # Up
+            ((SELECTED--))
+            if [ $SELECTED -lt 0 ]; then SELECTED=$((${#OPTIONS[@]} - 1)); fi
+        elif [[ $key == "[B" ]]; then # Down
+            ((SELECTED++))
+            if [ $SELECTED -ge ${#OPTIONS[@]} ]; then SELECTED=0; fi
+        fi
+    elif [[ $key == "" ]]; then # Enter
+        echo # Newline after selection
+        case $SELECTED in
+            0) first_run ;;
+            1) resume_run ;;
+            2) stop_container ;;
+            3) echo "Exiting..."; exit 0 ;;
+        esac
+    fi
 done
-
-# Pull the model interactively (shows progress bar)
-echo "Pulling model gemma3:27b..."
-docker exec -it "$CONTAINER_NAME" ollama pull gemma3:27b
-
-# 5. run "docker exec -it <container-name> bash"
-echo "Entering container $CONTAINER_NAME..."
-docker exec -it "$CONTAINER_NAME" bash
