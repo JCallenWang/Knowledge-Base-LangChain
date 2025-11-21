@@ -32,4 +32,3 @@ services:
 
 volumes:
   ollama:               # the name of volume
-    external: true      # true if exisit, false for creating automatically
