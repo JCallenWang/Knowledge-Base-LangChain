@@ -36,6 +36,24 @@ def load_data_from_sheet(input_file, sheet_name, header_index, merge_rows_count)
 
     return df_main, df_pre_header
 
+def _parse_excluded_rows(excluded_rows_config):
+    """Parses the excluded_rows config which can contain integers and string ranges like '18-134'."""
+    excluded = set()
+    if not excluded_rows_config:
+        return excluded
+    
+    for item in excluded_rows_config:
+        if isinstance(item, int):
+            excluded.add(item)
+        elif isinstance(item, str) and '-' in item:
+            try:
+                start, end = map(int, item.split('-'))
+                if start <= end:
+                    excluded.update(range(start, end + 1))
+            except ValueError:
+                print(f"Warning: Could not parse range '{item}' in excluded_rows. Skipping.")
+    return excluded
+
 def _load_and_clean_sheet(input_file, sheet_name, header_config):
     header_num = header_config['header_row']
     merge_rows_count = header_config['merge_rows']
@@ -89,8 +107,9 @@ def _load_and_clean_sheet(input_file, sheet_name, header_config):
             pass
 
     if excluded_rows:
+        parsed_excluded_rows = _parse_excluded_rows(excluded_rows)
         indices_to_drop = set()
-        for original_row in excluded_rows:
+        for original_row in parsed_excluded_rows:
             df_index = original_row - (header_num + 1)
             if 0 <= df_index < len(df):
                 indices_to_drop.add(df_index)
@@ -99,7 +118,7 @@ def _load_and_clean_sheet(input_file, sheet_name, header_config):
         if indices_to_drop:
             df.drop(list(indices_to_drop), inplace=True)
             removed_rows = initial_rows - len(df)
-            print(f"exclude {removed_rows} rows successfully (original row number: {excluded_rows}.)")
+            print(f"exclude {removed_rows} rows successfully (from config: {excluded_rows}).")
         else:
             print(f"cannot find valid rows to exclude in config file.")
     else:

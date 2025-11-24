@@ -37,7 +37,7 @@ def get_integer_input(prompt_text, min_value=1):
 def get_excluded_rows_input(sheet_name, header_row):
     prompt = (
         f"please enter *original rows* that will be excluded in sheet '{sheet_name}' (>{header_row}). "
-        f"example: 15,16,20,99 (separate with comma, leave empty if none): "
+        f"example: 15,16,20-99 (separate with comma, leave empty if none): "
     )
     
     while True:
@@ -46,17 +46,37 @@ def get_excluded_rows_input(sheet_name, header_row):
             if not input_str:
                 return []
             
-            rows = [int(r.strip()) for r in input_str.split(',') if r.strip().isdigit()]
-            
-            invalid_rows = [r for r in rows if r <= header_row]
-            if invalid_rows:
-                print(f"invalid input: excluded row ({invalid_rows}) must greater than the ends row of Header ({header_row}). please enter again.")
+            rows_to_exclude = []
+            raw_parts = [part.strip() for part in input_str.split(',') if part.strip()]
+
+            all_valid_rows = []
+            invalid_parts = []
+
+            for part in raw_parts:
+                if '-' in part:
+                    start, end = map(int, part.split('-'))
+                    if start > header_row and end > header_row and start <= end:
+                        all_valid_rows.extend(range(start, end + 1))
+                        rows_to_exclude.append(part)
+                    else:
+                        invalid_parts.append(part)
+                elif part.isdigit() and int(part) > header_row:
+                    all_valid_rows.append(int(part))
+                    rows_to_exclude.append(int(part))
+                else:
+                    invalid_parts.append(part)
+
+            if invalid_parts:
+                print(f"invalid input: parts must be integers or ranges (e.g., '20-30') greater than the header row ({header_row}). Invalid parts: {invalid_parts}. please enter again.")
                 continue
-                
-            return sorted(list(set(rows)))
-            
+
+            return rows_to_exclude
+
+        except ValueError:
+            print("invalid input format. please make sure to use integers or valid ranges (e.g., '20-30') separated by commas.")
         except Exception:
-            print("invalid input format. please make sure to use *,* to separate integer only.")
+            print("invalid input format. please make sure to use ',' to separate integers or ranges only.")
+            
 
 def generate_config(input_file, output_config_file):
     print(f"--- start generating config file of '{input_file}' ---")
