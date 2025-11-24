@@ -11,12 +11,13 @@ from data_initiation.sql_db_generator import initialize_database
 
 from agents.sql_agent import start_sql_agent
 
-ADDITIONAL_DESCRIPTION = """
-    請注意 :
-    - '姓氏' 欄位實際代表「單位／處室名稱」，並非人名，請以單位為統計依據，若為空值，請在統計時獨立歸類為「未知單位」。
-    - '彩色頁面' 欄位代表列印的彩色頁面數量。
-    - '黑白頁面' 欄位代表列印的黑白頁面數量。
-    """  
+#ADDITIONAL_DESCRIPTION = """
+#    請注意 :
+#    - '姓氏' 欄位實際代表「單位／處室名稱」，並非人名，請以單位為統計依據，若為空值，請在統計時獨立歸類為「未知單位」。
+#    - '彩色頁面' 欄位代表列印的彩色頁面數量。
+#    - '黑白頁面' 欄位代表列印的黑白頁面數量。
+#    """  
+ADDITIONAL_DESCRIPTION = ""
 
 def get_file_hash(file_path):
     """Computes the SHA256 hash of a file."""
@@ -77,7 +78,6 @@ def xlsx_to_sql_init(source_file):
     return database_dir
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Convert .xlsx into sql database.")
     parser = argparse.ArgumentParser(description="Process an .xlsx file to create a SQL database and then start an interactive SQL agent.")
     parser.add_argument("input_file", help="The name of the input source file (.xlsx).")
     args = parser.parse_args()

@@ -170,33 +170,8 @@ def process_single_sheet(input_file, output_file_path, sheet_name, header_config
         print(f"error occurred when writing file '{output_file_path}': {e}")
         return 0
 
-def process_single_sheet_with_separated_output(input_file, input_file_base, sheet_name, header_config):
-    df, metadata_string = _load_and_clean_sheet(input_file, sheet_name, header_config)
 
-    if df is None:
-        return 0
-
-    if df.empty:
-        print(f"sheet '{sheet_name}' have empty data after cleaning.")
-        return 0
-
-    records = _format_records(df, metadata_string)
-    
-    print(f"Saving each row to a separate .jsonl file.")
-    for i, record in enumerate(records):
-        output_file_path_row = f"{input_file_base}_{sanitize_filename(sheet_name)}_{i}.jsonl"
-        try:
-            with open(output_file_path_row, 'w', encoding='utf-8') as output_stream:
-                json_string = json.dumps(record, ensure_ascii=False)
-                output_stream.write(f"{json_string}\n")
-        except Exception as e:
-            print(f"Error occurred when writing file '{output_file_path_row}': {e}")
-
-    print(f"sheet '{sheet_name}' process complete, output {len(records)} separated datas.")
-    return len(records)
-
-
-def process_data_from_config(config_file, output_file_dir, separated_output=False, ):
+def process_data_from_config(config_file, output_file_dir):
     print(f"--- start processing: loading config '{config_file}' ---")
     
     try:
@@ -227,19 +202,13 @@ def process_data_from_config(config_file, output_file_dir, separated_output=Fals
         for sheet_name in sheet_names:
             header_config = sheets_config[sheet_name]
             
-            if not separated_output:
-                safe_sheet_name = sanitize_filename(sheet_name)
-                output_file_path = f"{output_file_dir}/{input_file_base}_{safe_sheet_name}.jsonl"
+            safe_sheet_name = sanitize_filename(sheet_name)
+            output_file_path = f"{output_file_dir}/{input_file_base}_{safe_sheet_name}.jsonl"
 
-                records_count = process_single_sheet(
-                    input_file, output_file_path, sheet_name, header_config
-                )
-                total_records += records_count
-            else:
-                records_count = process_single_sheet_with_separated_output(
-                    input_file, input_file_base, sheet_name, header_config
-                )
-                total_records += records_count
+            records_count = process_single_sheet(
+                input_file, output_file_path, sheet_name, header_config
+            )
+            total_records += records_count
         print("\n" + "=" * 50)
         print(f"process complete! all sheets have been converted into .jsonl file.")
         print(f"Total process count: {total_records}")
@@ -255,8 +224,6 @@ def process_data_from_config(config_file, output_file_dir, separated_output=Fals
 #    parser = argparse.ArgumentParser(description="Process Excel data based on a configuration file.")
 #    parser.add_argument("config_file", help="The name of the configuration file (e.g., config.json).")
 #    parser.add_argument("output_file_dir", help="The directory where the output files will be saved.")
-#    parser.add_argument("--separated_output", type=lambda x: x.lower() == 'true', default=False,
-#                        help="Set to 'True' to output each row as a separate .jsonl file, 'False' for combined output per sheet.")
 #    args = parser.parse_args()
 #
-#    process_data_from_config(args.config_file, args.output_file_dir, args.separated_output)
+#    process_data_from_config(args.config_file, args.output_file_dir)
