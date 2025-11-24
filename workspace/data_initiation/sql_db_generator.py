@@ -39,17 +39,52 @@ def _populate_db_from_docs(cursor, docs, table_name):
         # Use the first document to create the table schema
         first_doc_content = json.loads(docs[0].page_content)
         columns = first_doc_content.keys()
-        sql_columns = [f'"{col}" TEXT' for col in columns]
+        
+        # Infer column types
+        sql_columns = []
+        for col in columns:
+            col_type = "TEXT" # Default
+            is_numeric = True
+            is_integer = True
+            
+            # Check first few non-null values to infer type
+            check_count = 0
+            for doc in docs:
+                if check_count > 50: break # Check max 50 rows
+                try:
+                    val = json.loads(doc.page_content).get(col)
+                    if val is not None and val != "":
+                        check_count += 1
+                        try:
+                            float_val = float(val)
+                            if not float_val.is_integer():
+                                is_integer = False
+                        except ValueError:
+                            is_numeric = False
+                            break
+                except:
+                    pass
+            
+            if is_numeric and check_count > 0:
+                col_type = "INTEGER" if is_integer else "REAL"
+            
+            sql_columns.append(f'"{col}" {col_type}')
 
         create_table_query = f"CREATE TABLE IF NOT EXISTS \"{table_name}\" ({', '.join(sql_columns)})"
         cursor.execute(create_table_query)
-        print(f"Table '{table_name}' is ready.")
+        print(f"Table '{table_name}' is ready. Schema: {', '.join(sql_columns)}")
 
         # Insert data from all documents
         for doc in docs:
             try:
                 record = json.loads(doc.page_content)
-                values = [str(record.get(col, "")) for col in columns]
+                values = []
+                for col in columns:
+                    val = record.get(col)
+                    if val is None:
+                        values.append(None)
+                    else:
+                        values.append(str(val))
                 placeholders = ", ".join(["?"] * len(columns))
                 insert_query = f"INSERT INTO \"{table_name}\" ({', '.join(f'\"{c}\"' for c in columns)}) VALUES ({placeholders})"
                 cursor.execute(insert_query, values)

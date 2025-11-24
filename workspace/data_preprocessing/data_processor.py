@@ -153,11 +153,13 @@ def _format_records(df, metadata_string):
             if pd.notna(v):
                 if isinstance(v, (pd.Timestamp, datetime.datetime)):
                     record[k] = v.date().isoformat() if v.time() == datetime.time(0) else v.isoformat()
+                elif isinstance(v, datetime.time):
+                    record[k] = v.isoformat()
                 # pandas >= 2.0 uses pd.NA, older versions use np.nan
                 elif pd.isna(v):
-                     record[k] = ""
+                     record[k] = None
             else:
-                record[k] = ""
+                record[k] = None
         
         if metadata_string:
             record['ExtraInfo'] = metadata_string
