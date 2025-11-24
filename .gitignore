@@ -2,6 +2,10 @@
 *.json
 *.jsonl
 
+# untrack source excel files except Financial Sample.xlsx
+workspace/source/*.xlsx
+!workspace/source/Financial Sample.xlsx
+
 # untrack intermediate file
 /workspace/*.db
 /workspace/*.txt
