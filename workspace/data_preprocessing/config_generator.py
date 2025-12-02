@@ -39,88 +39,42 @@ def get_sheet_info(input_file: str) -> List[str]:
     else:
         raise ValueError(f"unsupported data format: {file_extension}. only support .xlsx or .xls.")
 
-def get_integer_input(prompt_text: str, min_value: int = 1) -> int:
+def detect_header_row(input_file: str, sheet_name: str, max_scan_rows: int = 20) -> int:
     """
-    Prompts the user for an integer input with validation.
+    Automatically detects the header row by finding the row with the most non-empty columns.
 
     Args:
-        prompt_text (str): The text to display in the prompt.
-        min_value (int, optional): The minimum acceptable value. Defaults to 1.
+        input_file (str): The path to the Excel file.
+        sheet_name (str): The name of the sheet to analyze.
+        max_scan_rows (int): The maximum number of rows to scan.
 
     Returns:
-        int: The validated integer input from the user.
+        int: The 1-based row number of the detected header.
     """
-    while True:
-        try:
-            prompt = f"please enter {prompt_text} (must >= {min_value}): "
-            value = int(input(prompt))
-
-            if value < min_value:
-                print(f"invalid input: value must be {min_value} or greater. please enter again.")
-                continue
-
-            return value
-
-        except ValueError:
-            print("invalid input: value must be valid integer. please enter again.")
-
-def get_excluded_rows_input(sheet_name: str, header_row: int) -> List[Union[int, str]]:
-    """
-    Prompts the user to specify rows to exclude from the data processing.
-
-    Args:
-        sheet_name (str): The name of the sheet being configured.
-        header_row (int): The row number where the header ends.
-
-    Returns:
-        List[Union[int, str]]: A list of row indices or range strings (e.g., '20-30') to exclude.
-    """
-    prompt = (
-        f"please enter *original rows* that will be excluded in sheet '{sheet_name}' (>{header_row}). "
-        f"example: 15,16,20-99 (separate with comma, leave empty if none): "
-    )
-
-    while True:
-        try:
-            input_str = input(prompt).strip()
-            if not input_str:
-                return []
-
-            rows_to_exclude = []
-            raw_parts = [part.strip() for part in input_str.split(',') if part.strip()]
-
-            all_valid_rows = []
-            invalid_parts = []
-
-            for part in raw_parts:
-                if '-' in part:
-                    start, end = map(int, part.split('-'))
-                    if start > header_row and end > header_row and start <= end:
-                        all_valid_rows.extend(range(start, end + 1))
-                        rows_to_exclude.append(part)
-                    else:
-                        invalid_parts.append(part)
-                elif part.isdigit() and int(part) > header_row:
-                    all_valid_rows.append(int(part))
-                    rows_to_exclude.append(int(part))
-                else:
-                    invalid_parts.append(part)
-
-            if invalid_parts:
-                print(f"invalid input: parts must be integers or ranges (e.g., '20-30') greater than the header row ({header_row}). Invalid parts: {invalid_parts}. please enter again.")
-                continue
-
-            return rows_to_exclude
-
-        except ValueError:
-            print("invalid input format. please make sure to use integers or valid ranges (e.g., '20-30') separated by commas.")
-        except Exception:
-            print("invalid input format. please make sure to use ',' to separate integers or ranges only.")
-
+    try:
+        # Read first few rows without header to analyze structure
+        df = pd.read_excel(input_file, sheet_name=sheet_name, header=None, nrows=max_scan_rows, engine='openpyxl')
+        
+        max_non_null = -1
+        header_idx = 0
+        
+        for idx, row in df.iterrows():
+            # Count non-null values
+            non_null_count = row.count()
+            if non_null_count > max_non_null:
+                max_non_null = non_null_count
+                header_idx = idx
+        
+        # Return 1-based index
+        return header_idx + 1
+        
+    except Exception as e:
+        print(f"Warning: Could not auto-detect header for sheet '{sheet_name}': {e}. Defaulting to row 1.")
+        return 1
 
 def generate_config(input_file: str, output_config_file: str) -> None:
     """
-    Generates a configuration file for the specified input Excel file.
+    Generates a configuration file for the specified input Excel file using automatic detection.
 
     Args:
         input_file (str): The path to the input Excel file.
@@ -148,28 +102,21 @@ def generate_config(input_file: str, output_config_file: str) -> None:
 
     for sheet_name in sheet_names:
         print("-" * 40)
-        print(f"setting sheet: '{sheet_name}'")
+        print(f"analyzing sheet: '{sheet_name}'")
 
-        header_num = get_integer_input(
-            f"the *ends row* of Header in '{sheet_name}' (start at 1)", 1
-        )
-
-        merge_rows_count = get_integer_input(
-            f"the number of Header rows in '{sheet_name} (1 = single row)", 1
-        )
-
-        if merge_rows_count > header_num:
-            print(f"Warning: the number of Header rows({merge_rows_count}) should <= the ends row of Header. the number of Header rows has set to {header_num}")
-            merge_rows_count = header_num
-
-        excluded_rows = get_excluded_rows_input(sheet_name, header_num)
+        # Auto-detect header
+        header_num = detect_header_row(input_file, sheet_name)
+        
+        # Default values for simplified flow
+        merge_rows_count = 1
+        excluded_rows = []
 
         config_data["sheets"][sheet_name] = {
             "header_row": header_num,
             "merge_rows": merge_rows_count,
             "excluded_rows": excluded_rows
         }
-        print(f"settings complete: Header ends in {header_num}, merged {merge_rows_count} rows, excluded rows: {excluded_rows if excluded_rows else 'none'}.")
+        print(f"auto-detection complete: Header at row {header_num}.")
 
     try:
         with open(output_config_file, 'w', encoding='utf-8') as f:

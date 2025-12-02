@@ -265,6 +265,81 @@ def process_single_sheet(input_file: str, output_file_path: str, sheet_name: str
         return 0
 
 
+def load_dataframes_from_config(config_file: str) -> Dict[str, pd.DataFrame]:
+    """
+    Loads and processes Excel sheets into Pandas DataFrames based on a configuration file.
+
+    Args:
+        config_file (str): The path to the JSON configuration file.
+
+    Returns:
+        Dict[str, pd.DataFrame]: A dictionary where keys are sheet names and values are processed DataFrames.
+    """
+    print(f"--- start processing: loading config '{config_file}' ---")
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: cannot find file '{config_file}'. please run 'config_generator.py' first")
+        return {}
+    except json.JSONDecodeError:
+        print(f"Error: config file '{config_file}' has wrong format.")
+        return {}
+
+    input_file = config_data.get("input_file")
+    sheets_config = config_data.get("sheets", {})
+
+    if not input_file or not sheets_config:
+        print("Error: information in config file is not completed. please check the fields of 'input_file', 'sheets'.")
+        return {}
+
+    sheet_names = list(sheets_config.keys())
+    print(f"source file: {input_file}")
+    print(f"total sheet count: {len(sheet_names)}, output as DataFrames")
+
+    processed_dfs = {}
+
+    try:
+        for sheet_name in sheet_names:
+            header_config = sheets_config[sheet_name]
+            
+            # Load and clean the sheet
+            df, metadata_string = _load_and_clean_sheet(input_file, sheet_name, header_config)
+
+            if df is None or df.empty:
+                print(f"sheet '{sheet_name}' is empty or failed to load.")
+                continue
+
+            # Add metadata as a column if it exists
+            if metadata_string:
+                df['ExtraInfo'] = metadata_string
+            
+            # Ensure all columns are string type for consistency before SQL export, 
+            # or let pandas handle types. 
+            # The previous logic in _format_records handled dates. 
+            # Let's do a quick pass to ensure dates are strings if we want strict compatibility, 
+            # but SQLite handles dates as strings usually.
+            # However, to match previous behavior:
+            for col in df.columns:
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                     df[col] = df[col].apply(lambda x: x.date().isoformat() if pd.notnull(x) and x.time() == datetime.time(0) else (x.isoformat() if pd.notnull(x) else None))
+
+            processed_dfs[sheet_name] = df
+            print(f"sheet '{sheet_name}' processed into DataFrame with {len(df)} rows.")
+
+        print("\n" + "=" * 50)
+        print(f"process complete! {len(processed_dfs)} sheets loaded.")
+        print("=" * 50)
+        return processed_dfs
+
+    except FileNotFoundError:
+        print(f"Error: cannot find source file '{input_file}'.")
+        return {}
+    except Exception as e:
+        print(f"Error: unexpected error occurred: {e}")
+        return {}
+
 def process_data_from_config(config_file: str, output_file_dir: str) -> None:
     """
     Orchestrates the data processing workflow based on a configuration file.

@@ -13,8 +13,8 @@ import glob
 import argparse
 
 from data_preprocessing.config_generator import generate_config
-from data_preprocessing.data_processor import process_data_from_config
-from data_initiation.sql_db_generator import initialize_database
+from data_preprocessing.data_processor import load_dataframes_from_config
+from data_initiation.sql_db_generator import create_dbs_from_dataframes
 
 from agents.sql_agent import start_sql_agent
 
@@ -55,9 +55,9 @@ def xlsx_to_sql_init(source_file: str) -> str:
 
     This function handles:
     1. Hashing the file to create a unique workspace.
-    2. Generating a configuration file for the Excel data.
-    3. Processing the Excel data into JSONL format.
-    4. initializing a SQLite database from the JSONL data.
+    2. Generating a configuration file for the Excel data (automatically).
+    3. Processing the Excel data directly into DataFrames.
+    4. Creating SQLite databases from the DataFrames.
 
     Args:
         source_file (str): The path to the source .xlsx file.
@@ -75,7 +75,7 @@ def xlsx_to_sql_init(source_file: str) -> str:
     root_output_dir = f"./{base_name}_{file_hash[:8]}"
     source_files_dir = os.path.join(root_output_dir, "source")
     config_files_dir = os.path.join(root_output_dir, "config")
-    processed_data_dir = os.path.join(root_output_dir, "processed_data")
+    # processed_data_dir is no longer needed in the simplified flow
     database_dir = os.path.join(root_output_dir, "database")
 
     if os.path.isdir(database_dir) and glob.glob(os.path.join(database_dir, '*.db')):
@@ -87,7 +87,6 @@ def xlsx_to_sql_init(source_file: str) -> str:
     os.makedirs(root_output_dir, exist_ok=True)
     os.makedirs(source_files_dir, exist_ok=True)
     os.makedirs(config_files_dir, exist_ok=True)
-    os.makedirs(processed_data_dir, exist_ok=True)
     os.makedirs(database_dir, exist_ok=True)
 
     config_file = os.path.join(config_files_dir, f"{base_name}_config.json")
@@ -95,14 +94,14 @@ def xlsx_to_sql_init(source_file: str) -> str:
     staged_source_file = os.path.join(source_files_dir, os.path.basename(source_file))
     shutil.copy(source_file, staged_source_file)
 
-    print("\nStep 1: Generating configuration file...")
+    print("\nStep 1: Generating configuration file (Auto-Detection)...")
     generate_config(staged_source_file, config_file)
 
-    print("\nStep 2: Processing data and converting to JSONL...")
-    process_data_from_config(config_file, processed_data_dir)
+    print("\nStep 2: Loading data into DataFrames...")
+    dfs = load_dataframes_from_config(config_file)
 
-    print("\nStep 3: Initializing SQL database from JSONL files...")
-    initialize_database(processed_data_dir, database_dir)
+    print("\nStep 3: Creating SQL databases from DataFrames...")
+    create_dbs_from_dataframes(dfs, database_dir)
 
     print(f"\nWorkflow complete! All artifacts are located in '{root_output_dir}'.")
     return database_dir

@@ -128,6 +128,56 @@ def _populate_db_from_docs(cursor: sqlite3.Cursor, docs: List[Document], table_n
         print(f"An SQLite error occurred while processing table '{table_name}': {e}")
         return 0
 
+def create_dbs_from_dataframes(dfs: dict, output_dir: str) -> None:
+    """
+    Creates SQLite databases from a dictionary of Pandas DataFrames.
+    Each DataFrame is saved to a separate database file named after the dictionary key (sheet name).
+
+    Args:
+        dfs (dict): A dictionary where keys are sheet names and values are Pandas DataFrames.
+        output_dir (str): The directory where the .db files will be saved.
+
+    Returns:
+        None
+    """
+    if not dfs:
+        print("No DataFrames to process.")
+        return
+
+    os.makedirs(output_dir, exist_ok=True)
+    total_records = 0
+
+    for sheet_name, df in dfs.items():
+        # Sanitize sheet name for filename
+        safe_name = sheet_name.strip().replace(' ', '_')
+        safe_name = "".join([c for c in safe_name if c.isalnum() or c in ('-', '_')])
+        
+        db_name = os.path.join(output_dir, f"{safe_name}.db")
+        print(f"\nCreating database for sheet '{sheet_name}' at '{db_name}'")
+
+        if os.path.exists(db_name):
+            print(f"---Existing database '{db_name}' found, removing it before recreation.---")
+            os.remove(db_name)
+
+        try:
+            conn = sqlite3.connect(db_name)
+            # Write DataFrame to SQL
+            # Using 'replace' to ensure clean state, though we just deleted the file.
+            # index=False to avoid writing the pandas index as a column
+            df.to_sql(safe_name, conn, if_exists='replace', index=False)
+            
+            count = len(df)
+            total_records += count
+            print(f"Successfully inserted {count} records into table '{safe_name}'.")
+            
+            conn.close()
+            print(f"Database '{db_name}' created successfully.")
+            
+        except Exception as e:
+            print(f"Error creating database for '{sheet_name}': {e}")
+
+    print(f"\nAll databases created. Total records inserted: {total_records}.")
+
 def _create_dbs_from_jsonl_files(input_dir: str, output_dir: str) -> None:
     """
     Creates a separate SQLite database for each .jsonl file in a directory.
