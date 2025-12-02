@@ -1,3 +1,10 @@
+"""
+Main entry point for the Excel to SQL Agent workflow.
+
+This module coordinates the entire process of converting an Excel file to a SQL database
+and starting an interactive SQL agent to query the data.
+"""
+
 import os
 import sys
 import shutil
@@ -19,8 +26,16 @@ from agents.sql_agent import start_sql_agent
 #    """  
 ADDITIONAL_DESCRIPTION = ""
 
-def get_file_hash(file_path):
-    """Computes the SHA256 hash of a file."""
+def get_file_hash(file_path: str) -> str:
+    """
+    Computes the SHA256 hash of a file.
+
+    Args:
+        file_path (str): The path to the file to hash.
+
+    Returns:
+        str: The hexadecimal SHA256 hash of the file content.
+    """
     hasher = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
@@ -34,7 +49,22 @@ def get_file_hash(file_path):
         print(f"An error occurred while hashing the file: {e}")
         sys.exit(1)
 
-def xlsx_to_sql_init(source_file):
+def xlsx_to_sql_init(source_file: str) -> str:
+    """
+    Converts an Excel file to a SQL database through a series of processing steps.
+
+    This function handles:
+    1. Hashing the file to create a unique workspace.
+    2. Generating a configuration file for the Excel data.
+    3. Processing the Excel data into JSONL format.
+    4. initializing a SQLite database from the JSONL data.
+
+    Args:
+        source_file (str): The path to the source .xlsx file.
+
+    Returns:
+        str: The path to the directory containing the generated database(s).
+    """
     if not os.path.exists(source_file) or not source_file.endswith('.xlsx'):
         print(f"Error: File '{source_file}' is not a valid .xlsx file.")
         sys.exit(1)

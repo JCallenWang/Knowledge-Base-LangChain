@@ -1,3 +1,10 @@
+"""
+Module for generating SQLite databases from JSONL files.
+
+This module processes JSON Lines (.jsonl) files, infers the schema from the data,
+and populates SQLite databases with the content.
+"""
+
 from langchain_community.document_loaders import JSONLoader
 from langchain_core.documents import Document
 
@@ -6,8 +13,18 @@ import json
 import sqlite3
 import os
 import glob
+from typing import List, Any
 
-def _load_processed_data(file_path: str) -> list[Document]:
+def _load_processed_data(file_path: str) -> List[Document]:
+    """
+    Loads and processes JSONL data from a file.
+
+    Args:
+        file_path (str): The path to the .jsonl file.
+
+    Returns:
+        List[Document]: A list of LangChain Document objects containing the loaded data.
+    """
     loader = JSONLoader(
         file_path=file_path,
         jq_schema='.', # Process each JSONL object (line)
@@ -29,8 +46,18 @@ def _load_processed_data(file_path: str) -> list[Document]:
         )
     return readable_docs
 
-def _populate_db_from_docs(cursor, docs, table_name):
-    """Helper function to create a table and insert documents into it."""
+def _populate_db_from_docs(cursor: sqlite3.Cursor, docs: List[Document], table_name: str) -> int:
+    """
+    Creates a table and inserts documents into the SQLite database.
+
+    Args:
+        cursor (sqlite3.Cursor): The SQLite database cursor.
+        docs (List[Document]): The list of documents to insert.
+        table_name (str): The name of the table to create and populate.
+
+    Returns:
+        int: The number of records successfully inserted.
+    """
     if not docs:
         print(f"No documents to process for table '{table_name}'.")
         return 0
@@ -101,13 +128,16 @@ def _populate_db_from_docs(cursor, docs, table_name):
         print(f"An SQLite error occurred while processing table '{table_name}': {e}")
         return 0
 
-def _create_dbs_from_jsonl_files(input_dir: str, output_dir: str):
+def _create_dbs_from_jsonl_files(input_dir: str, output_dir: str) -> None:
     """
     Creates a separate SQLite database for each .jsonl file in a directory.
 
     Args:
         input_dir (str): The directory containing the .jsonl files.
         output_dir (str): The directory where the .db files will be saved.
+
+    Returns:
+        None
     """
     jsonl_files = glob.glob(os.path.join(input_dir, '*.jsonl'))
     if not jsonl_files:
@@ -139,7 +169,7 @@ def _create_dbs_from_jsonl_files(input_dir: str, output_dir: str):
 
     print(f"\nAll databases created. Total records inserted across all databases: {total_records}.")
 
-def initialize_database(input_dir: str, output_dir: str):
+def initialize_database(input_dir: str, output_dir: str) -> None:
     """
     Initializes the database(s) from .jsonl files in the input directory.
     This function creates a separate .db file for each .jsonl file found.
@@ -147,6 +177,9 @@ def initialize_database(input_dir: str, output_dir: str):
     Args:
         input_dir (str): The directory containing the .jsonl files.
         output_dir (str): The directory where the .db files will be saved.
+
+    Returns:
+        None
     """
     if not glob.glob(os.path.join(input_dir, '*.jsonl')):
         print("No processed data files found. Skipping database creation.")

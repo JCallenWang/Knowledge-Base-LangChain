@@ -1,30 +1,59 @@
+"""
+Module for processing Excel data based on configuration files.
+
+This module reads Excel sheets according to a provided configuration, cleans the data
+by handling headers, metadata, and excluded rows, and outputs the result as JSONL files.
+"""
+
 import argparse
 import pandas as pd
 import os
 import json
 import re
 import datetime
+from typing import List, Set, Union, Tuple, Optional, Dict, Any
 
-def sanitize_filename(name):
+def sanitize_filename(name: str) -> str:
+    """
+    Sanitizes a string to be safe for use as a filename.
+
+    Args:
+        name (str): The original filename string.
+
+    Returns:
+        str: The sanitized filename string with special characters removed or replaced.
+    """
     name = name.strip().replace(' ', '_')
     name = re.sub(r'[^\w\-]', '', name)
     return name
 
-def load_data_from_sheet(input_file, sheet_name, header_index, merge_rows_count):
+def load_data_from_sheet(input_file: str, sheet_name: str, header_index: int, merge_rows_count: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Loads data and metadata (pre-header rows) from a specific Excel sheet.
+
+    Args:
+        input_file (str): The path to the Excel file.
+        sheet_name (str): The name of the sheet to load.
+        header_index (int): The 0-based index of the last header row.
+        merge_rows_count (int): The number of rows that make up the header.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the main data DataFrame and the pre-header (metadata) DataFrame.
+    """
     header_indices = list(range(header_index - merge_rows_count + 1, header_index + 1))
     before_header_rows_count = header_indices[0]
 
     kwargs_excel = {'engine': 'openpyxl', 'sheet_name': sheet_name}
-    
+
     # Main data
     kwargs_main = {'header': header_indices, **kwargs_excel}
     df_main = pd.read_excel(input_file, **kwargs_main)
-    
+
     # merge header
     if merge_rows_count > 1:
         df_main.columns = [
             ' - '.join(
-                str(c).strip() for c in col 
+                str(c).strip() for c in col
                 if not pd.isna(c) and str(c).strip() and not str(c).strip().startswith('Unnamed:'))
             for col in df_main.columns.values
         ]
@@ -36,12 +65,20 @@ def load_data_from_sheet(input_file, sheet_name, header_index, merge_rows_count)
 
     return df_main, df_pre_header
 
-def _parse_excluded_rows(excluded_rows_config):
-    """Parses the excluded_rows config which can contain integers and string ranges like '18-134'."""
+def _parse_excluded_rows(excluded_rows_config: List[Union[int, str]]) -> Set[int]:
+    """
+    Parses the excluded_rows config into a set of integer row indices.
+
+    Args:
+        excluded_rows_config (List[Union[int, str]]): A list of integers or string ranges (e.g., '18-134').
+
+    Returns:
+        Set[int]: A set of unique row numbers to exclude.
+    """
     excluded = set()
     if not excluded_rows_config:
         return excluded
-    
+
     for item in excluded_rows_config:
         if isinstance(item, int):
             excluded.add(item)
@@ -54,7 +91,20 @@ def _parse_excluded_rows(excluded_rows_config):
                 print(f"Warning: Could not parse range '{item}' in excluded_rows. Skipping.")
     return excluded
 
-def _load_and_clean_sheet(input_file, sheet_name, header_config):
+def _load_and_clean_sheet(input_file: str, sheet_name: str, header_config: Dict[str, Any]) -> Tuple[Optional[pd.DataFrame], str]:
+    """
+    Loads an Excel sheet and applies cleaning operations such as removing empty columns,
+    processing headers, and excluding specified rows.
+
+    Args:
+        input_file (str): The path to the Excel file.
+        sheet_name (str): The name of the sheet to process.
+        header_config (Dict[str, Any]): Configuration dictionary containing 'header_row', 'merge_rows', and 'excluded_rows'.
+
+    Returns:
+        Tuple[Optional[pd.DataFrame], str]: A tuple containing the cleaned DataFrame and a metadata string.
+        Returns (None, None) if loading fails.
+    """
     header_num = header_config['header_row']
     merge_rows_count = header_config['merge_rows']
     excluded_rows = header_config.get('excluded_rows', [])
@@ -75,7 +125,7 @@ def _load_and_clean_sheet(input_file, sheet_name, header_config):
             df_pre_header = pd.DataFrame()
             is_metadata_present = False
             print("using default Metadata.")
-            
+
     except Exception as e:
         print(f"loading data failed: {e}")
         return None, None
@@ -98,7 +148,7 @@ def _load_and_clean_sheet(input_file, sheet_name, header_config):
     df.columns = df.columns.astype(str)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed:')]
     df.columns = df.columns.str.strip()
-    
+
     float_cols = df.select_dtypes(include=['float64']).columns
     for col in float_cols:
         try:
@@ -136,18 +186,29 @@ def _load_and_clean_sheet(input_file, sheet_name, header_config):
             if clean_row:
                 clean_row = clean_row.replace('\n', ' ').strip()
                 metadata_list.append(clean_row)
-        
+
         metadata_string = ' | '.join(metadata_list)
         print("Metadata have been extracted from sheet and structured successfully.")
-    
+
     return df, metadata_string
 
-def _format_records(df, metadata_string):
+def _format_records(df: pd.DataFrame, metadata_string: str) -> List[Dict[str, Any]]:
+    """
+    Formats the DataFrame records into a list of dictionaries, handling timestamps
+    and appending metadata.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        metadata_string (str): The metadata string to append to each record.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries representing the records.
+    """
     if df.empty:
         return []
 
     records = df.to_dict(orient='records')
-    
+
     for record in records:
         for k, v in record.items():
             if pd.notna(v):
@@ -160,13 +221,25 @@ def _format_records(df, metadata_string):
                      record[k] = None
             else:
                 record[k] = None
-        
+
         if metadata_string:
             record['ExtraInfo'] = metadata_string
 
     return records
 
-def process_single_sheet(input_file, output_file_path, sheet_name, header_config):
+def process_single_sheet(input_file: str, output_file_path: str, sheet_name: str, header_config: Dict[str, Any]) -> int:
+    """
+    Processes a single sheet from an Excel file and saves it as a JSONL file.
+
+    Args:
+        input_file (str): The path to the input Excel file.
+        output_file_path (str): The path where the JSONL output will be saved.
+        sheet_name (str): The name of the sheet to process.
+        header_config (Dict[str, Any]): Configuration for the sheet's header and structure.
+
+    Returns:
+        int: The number of records successfully written to the output file.
+    """
     df, metadata_string = _load_and_clean_sheet(input_file, sheet_name, header_config)
 
     if df is None:
@@ -183,18 +256,28 @@ def process_single_sheet(input_file, output_file_path, sheet_name, header_config
             for record in records:
                 json_string = json.dumps(record, ensure_ascii=False)
                 output_stream.write(f"{json_string}\n")
-        
+
         print(f"sheet '{sheet_name}' process complete, output {len(records)} datas to '{output_file_path}'.")
         return len(records)
-    
+
     except Exception as e:
         print(f"error occurred when writing file '{output_file_path}': {e}")
         return 0
 
 
-def process_data_from_config(config_file, output_file_dir):
+def process_data_from_config(config_file: str, output_file_dir: str) -> None:
+    """
+    Orchestrates the data processing workflow based on a configuration file.
+
+    Args:
+        config_file (str): The path to the JSON configuration file.
+        output_file_dir (str): The directory where the output JSONL files will be saved.
+
+    Returns:
+        None
+    """
     print(f"--- start processing: loading config '{config_file}' ---")
-    
+
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
@@ -207,22 +290,22 @@ def process_data_from_config(config_file, output_file_dir):
 
     input_file = config_data.get("input_file")
     sheets_config = config_data.get("sheets", {})
-    
+
     if not input_file or not sheets_config:
         print("Error: information in config file is not completed. please check the fields of 'input_file', 'sheets'.")
         return
-        
+
     total_records = 0
     sheet_names = list(sheets_config.keys())
     input_file_base = os.path.splitext(os.path.basename(input_file))[0]
-    
+
     print(f"source file: {input_file}")
     print(f"total sheet count: {len(sheet_names)}, output as .jsonl file")
-    
+
     try:
         for sheet_name in sheet_names:
             header_config = sheets_config[sheet_name]
-            
+
             safe_sheet_name = sanitize_filename(sheet_name)
             output_file_path = f"{output_file_dir}/{input_file_base}_{safe_sheet_name}.jsonl"
 
@@ -234,7 +317,7 @@ def process_data_from_config(config_file, output_file_dir):
         print(f"process complete! all sheets have been converted into .jsonl file.")
         print(f"Total process count: {total_records}")
         print("=" * 50)
-        
+
     except FileNotFoundError:
         print(f"Error: cannot find source file '{input_file}'.")
     except Exception as e:

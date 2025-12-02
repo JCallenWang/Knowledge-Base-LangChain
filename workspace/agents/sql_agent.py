@@ -1,3 +1,11 @@
+"""
+Main module for the SQL Agent.
+
+This module initializes and runs the SQL agent, which processes user questions,
+selects appropriate databases, generates and executes SQL queries, and constructs
+natural language responses.
+"""
+
 from langchain_ollama import OllamaLLM
 from langchain_core.runnables import RunnableLambda, Runnable
 from langchain_community.utilities import SQLDatabase
@@ -6,7 +14,7 @@ import os
 import re
 import time
 import glob
-from typing import Dict
+from typing import Dict, Tuple, Optional
 from sqlalchemy.exc import OperationalError  
 
 from .utils_sql import PromptFactory, SQLAgentContext
@@ -22,7 +30,13 @@ SQL_LLM = "gemma3:27b"
 #SQL_LLM = "duckdb-nsql:latest"
 
 
-def init_model():
+def init_model() -> Tuple[OllamaLLM, OllamaLLM]:
+    """
+    Initializes the LLM models for general tasks and SQL generation.
+
+    Returns:
+        Tuple[OllamaLLM, OllamaLLM]: A tuple containing the main LLM and the SQL-specific LLM.
+    """
     llm = OllamaLLM(
         model = LLM_MODEL,
         #callbacks = [StreamingStdOutCallbackHandler()]
@@ -35,6 +49,15 @@ def init_model():
     return llm, sqlm
 
 def check_sql_query(query: str) -> bool:
+    """
+    Checks if the SQL query contains potentially dangerous operations.
+
+    Args:
+        query (str): The SQL query string to check.
+
+    Returns:
+        bool: True if the query contains disallowed keywords (e.g., DELETE, DROP), False otherwise.
+    """
     if any(keyword in query.upper() for keyword in ["DELETE FROM", "UPDATE", "INSERT INTO", "DROP TABLE", "ALTER TABLE", "CREATE TABLE"]):
         return True
     return False
@@ -43,6 +66,12 @@ def _parse_sql_query(raw_query: str) -> str:
     """
     Parses a raw string to extract a clean SQL query,
     removing markdown code blocks if present.
+
+    Args:
+        raw_query (str): The raw string output from the LLM, which may contain markdown formatting.
+
+    Returns:
+        str: The extracted and cleaned SQL query string.
     """
     # Match content inside ```sql ... ``` or ``` ... ```
     match = re.search(r"```(?:sql)?\n(.*?)\n```", raw_query, re.DOTALL)
@@ -51,14 +80,17 @@ def _parse_sql_query(raw_query: str) -> str:
     return raw_query.strip().strip('`').strip()
 
 
-def start_sql_agent(db_dir_path: str, additional_description: str):
+def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
     """
     Initializes and starts the SQL agent, which can handle either a single database file
     or a directory of databases.
 
     Args:
-        db_path (str): The path to the database file or directory.
-        schema_description (str): A description of the database schema.
+        db_dir_path (str): The path to the database file or directory containing database files.
+        additional_description (str): A description of the database schema or additional context for the agent.
+
+    Returns:
+        None
     """
     llm, sqlm = init_model()
 
@@ -79,6 +111,15 @@ def start_sql_agent(db_dir_path: str, additional_description: str):
     db_connections: Dict[str, SQLDatabase] = {}
 
     def get_db_connection(db_file_path: str) -> SQLDatabase:
+        """
+        Retrieves or creates a connection to the specified SQLite database file.
+
+        Args:
+            db_file_path (str): The path to the database file.
+
+        Returns:
+            SQLDatabase: The LangChain SQLDatabase object for the given file.
+        """
         if db_file_path not in db_connections:
             #print(f"\nConnecting to database: '{db_file_path}'")
             db_connections[db_file_path] = SQLDatabase.from_uri(
@@ -88,6 +129,15 @@ def start_sql_agent(db_dir_path: str, additional_description: str):
         return db_connections[db_file_path]
 
     def run_sql_query(context: SQLAgentContext) -> SQLAgentContext:
+        """
+        Executes the generated SQL query and handles errors with automatic retry/correction.
+
+        Args:
+            context (SQLAgentContext): The current execution context containing the query and database connection.
+
+        Returns:
+            SQLAgentContext: The updated context with the query execution result.
+        """
         query = context.query
         db = context.db
         
@@ -120,7 +170,17 @@ def start_sql_agent(db_dir_path: str, additional_description: str):
         context.result = f"Error occurred when executing query: '{query}' with error: {str(e) if 'e' in locals() else 'Unknown error'}"
         return context
 
-    def start_query_system(chain: Runnable, is_multi_db: bool):
+    def start_query_system(chain: Runnable, is_multi_db: bool) -> None:
+        """
+        Starts the interactive command-line query loop.
+
+        Args:
+            chain (Runnable): The LangChain runnable chain to process user queries.
+            is_multi_db (bool): Indicates if multiple databases are available (enables database selection).
+
+        Returns:
+            None
+        """
         while True:
             user_input = input("(Enter 'bye'/'exit' to exit the query system) Enter a question: ") 
             if user_input.lower() in ('bye', 'exit', 'clear'):
@@ -177,4 +237,3 @@ def start_sql_agent(db_dir_path: str, additional_description: str):
     )
 
     start_query_system(db_chain, is_multi_db=len(db_files) > 1)
-
