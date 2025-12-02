@@ -1,12 +1,32 @@
+"""
+Module for generating configuration files for data processing.
+
+This module analyzes Excel files to extract sheet information and prompts the user
+to define header structures and excluded rows, saving the configuration to a JSON file.
+"""
+
 import pandas as pd
 import sys
 import os
 import json
 import argparse
+from typing import List, Union
 
-def get_sheet_info(input_file):
+def get_sheet_info(input_file: str) -> List[str]:
+    """
+    Retrieves the list of sheet names from an Excel file.
+
+    Args:
+        input_file (str): The path to the Excel file.
+
+    Returns:
+        List[str]: A list of sheet names found in the Excel file.
+
+    Raises:
+        ValueError: If the file format is not supported (not .xlsx or .xls).
+    """
     file_extension = os.path.splitext(input_file)[1].lower()
-    
+
     if file_extension in ['.xlsx', '.xls']:
         try:
             xls = pd.ExcelFile(input_file, engine='openpyxl')
@@ -15,37 +35,57 @@ def get_sheet_info(input_file):
         except Exception as e:
             print(f"failed to load Excel or sheet information: {e}")
             sys.exit(1)
-            
+
     else:
         raise ValueError(f"unsupported data format: {file_extension}. only support .xlsx or .xls.")
 
-def get_integer_input(prompt_text, min_value=1):
+def get_integer_input(prompt_text: str, min_value: int = 1) -> int:
+    """
+    Prompts the user for an integer input with validation.
+
+    Args:
+        prompt_text (str): The text to display in the prompt.
+        min_value (int, optional): The minimum acceptable value. Defaults to 1.
+
+    Returns:
+        int: The validated integer input from the user.
+    """
     while True:
         try:
             prompt = f"please enter {prompt_text} (must >= {min_value}): "
             value = int(input(prompt))
-            
+
             if value < min_value:
                 print(f"invalid input: value must be {min_value} or greater. please enter again.")
                 continue
-                
+
             return value
-            
+
         except ValueError:
             print("invalid input: value must be valid integer. please enter again.")
-            
-def get_excluded_rows_input(sheet_name, header_row):
+
+def get_excluded_rows_input(sheet_name: str, header_row: int) -> List[Union[int, str]]:
+    """
+    Prompts the user to specify rows to exclude from the data processing.
+
+    Args:
+        sheet_name (str): The name of the sheet being configured.
+        header_row (int): The row number where the header ends.
+
+    Returns:
+        List[Union[int, str]]: A list of row indices or range strings (e.g., '20-30') to exclude.
+    """
     prompt = (
         f"please enter *original rows* that will be excluded in sheet '{sheet_name}' (>{header_row}). "
         f"example: 15,16,20-99 (separate with comma, leave empty if none): "
     )
-    
+
     while True:
         try:
             input_str = input(prompt).strip()
             if not input_str:
                 return []
-            
+
             rows_to_exclude = []
             raw_parts = [part.strip() for part in input_str.split(',') if part.strip()]
 
@@ -76,11 +116,21 @@ def get_excluded_rows_input(sheet_name, header_row):
             print("invalid input format. please make sure to use integers or valid ranges (e.g., '20-30') separated by commas.")
         except Exception:
             print("invalid input format. please make sure to use ',' to separate integers or ranges only.")
-            
 
-def generate_config(input_file, output_config_file):
+
+def generate_config(input_file: str, output_config_file: str) -> None:
+    """
+    Generates a configuration file for the specified input Excel file.
+
+    Args:
+        input_file (str): The path to the input Excel file.
+        output_config_file (str): The path where the generated JSON configuration will be saved.
+
+    Returns:
+        None
+    """
     print(f"--- start generating config file of '{input_file}' ---")
-    
+
     try:
         sheet_names = get_sheet_info(input_file)
         print(f"detect {len(sheet_names)} sheet(s).")
@@ -124,7 +174,7 @@ def generate_config(input_file, output_config_file):
     try:
         with open(output_config_file, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, ensure_ascii=False, indent=4)
-        
+
         print("\n" + "=" * 50)
         print(f"config generate successfully! please check '{output_config_file}'.")
         print("=" * 50)
