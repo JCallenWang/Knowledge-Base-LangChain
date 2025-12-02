@@ -12,6 +12,7 @@ services:
       dockerfile: Dockerfile.stg
     ports:
       - "11450:11434"
+      - "8000:8000"
     volumes:
       - ../../workspace:/workspace
       - ollama:/root/.ollama

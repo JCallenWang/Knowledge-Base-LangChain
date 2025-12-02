@@ -1,16 +1,10 @@
-"""
-Module for generating configuration files for data processing.
-
-This module analyzes Excel files to extract sheet information and prompts the user
-to define header structures and excluded rows, saving the configuration to a JSON file.
-"""
-
 import pandas as pd
 import sys
 import os
 import json
 import argparse
-from typing import List, Union
+import datetime
+from typing import List, Union, Tuple
 
 def get_sheet_info(input_file: str) -> List[str]:
     """
@@ -39,9 +33,15 @@ def get_sheet_info(input_file: str) -> List[str]:
     else:
         raise ValueError(f"unsupported data format: {file_extension}. only support .xlsx or .xls.")
 
-def detect_header_row(input_file: str, sheet_name: str, max_scan_rows: int = 20) -> int:
+def detect_header_and_merge_count(input_file: str, sheet_name: str, max_scan_rows: int = 20) -> Tuple[int, int]:
     """
-    Automatically detects the header row by finding the row with the most non-empty columns.
+    Automatically detects the header row and the number of rows to merge.
+    
+    Strategy:
+    1. Identify the first row that looks like "Data" (mostly numeric or dates).
+    2. The row immediately preceding the first data row is the "Header End Row".
+    3. All rows from the top down to the "Header End Row" are considered part of the header (merged).
+    4. Fallback: If no data row is found (e.g., all text), use the "Max Non-Nulls" strategy.
 
     Args:
         input_file (str): The path to the Excel file.
@@ -49,28 +49,102 @@ def detect_header_row(input_file: str, sheet_name: str, max_scan_rows: int = 20)
         max_scan_rows (int): The maximum number of rows to scan.
 
     Returns:
-        int: The 1-based row number of the detected header.
+        Tuple[int, int]: (header_row_number (1-based), merge_rows_count)
     """
     try:
         # Read first few rows without header to analyze structure
         df = pd.read_excel(input_file, sheet_name=sheet_name, header=None, nrows=max_scan_rows, engine='openpyxl')
         
-        max_non_null = -1
-        header_idx = 0
+        if df.empty:
+            return 1, 1
+
+        first_data_idx = -1
         
         for idx, row in df.iterrows():
-            # Count non-null values
+            numeric_count = 0
+            total_count = 0
+            for val in row:
+                if pd.isna(val): continue
+                total_count += 1
+                
+                # Check for numeric or date types
+                # Note: bool is subclass of int, but usually we don't count it as "data" in this context? 
+                # Actually bool data is rare in these reports, but let's count it as data if present.
+                if isinstance(val, (int, float, complex)):
+                    numeric_count += 1
+                elif isinstance(val, (pd.Timestamp, datetime.datetime, datetime.date, datetime.time)):
+                    numeric_count += 1
+            
+            # If > 40% of non-null values are numeric/date, consider it a Data row
+            ratio = numeric_count / total_count if total_count > 0 else 0
+            # print(f"Row {idx}: numeric={numeric_count}, total={total_count}, ratio={ratio:.2f}")
+            if total_count > 0 and ratio > 0.4:
+                first_data_idx = idx
+                break
+        
+        if first_data_idx > 0:
+            # Found a data row. The header ends at the previous row.
+            header_end_idx = first_data_idx - 1
+            # Merge everything from top to header_end_idx
+            # But we should check if top rows are empty?
+            # Let's count non-empty rows above header_end_idx
+            merge_count = 0
+            for i in range(header_end_idx, -1, -1):
+                if df.iloc[i].count() > 0:
+                    merge_count += 1
+                else:
+                    # If we hit an empty row, do we stop? 
+                    # Usually yes, but if there is a Title at Row 0 and Header at Row 2, Row 1 empty.
+                    # We probably don't want to merge Title if there is a gap.
+                    break
+            
+            return header_end_idx + 1, merge_count
+        elif first_data_idx == 0:
+             # The very first row looks like data.
+             # This is tricky. It could be a file without header, or the first row IS the header but contains numbers (e.g. years).
+             # However, standard Excel files usually have a string header.
+             # If Row 0 is data-like, we might assume:
+             # A) No header (rare for this use case)
+             # B) Header is actually Row 0, but our heuristic failed (e.g. header has dates?)
+             # C) The heuristic is too aggressive.
+             
+             # Let's check if Row 0 is purely string.
+             # If Row 0 is mixed/numeric, and we think it's data, maybe we default to Header=Row 1, Merge=1?
+             # But wait, if Row 0 is data, then where is the header?
+             # If the file has NO header, we can't really support it easily without column names.
+             # So let's assume Row 0 is the Header, even if it looks like data (unlikely) OR our heuristic is just finding data immediately at Row 1 (0-index).
+             
+             # Actually, if first_data_idx == 0, it means Row 0 is data.
+             # But we need a header.
+             # Let's assume Row 0 is Header (1-based Row 1) and Row 1 is Data.
+             # This is the standard case: Header at 1, Data at 2.
+             return 1, 1
+
+        # Fallback: Max Non-Nulls Strategy
+        max_non_null = -1
+        header_end_idx = 0
+        
+        for idx, row in df.iterrows():
             non_null_count = row.count()
             if non_null_count > max_non_null:
                 max_non_null = non_null_count
-                header_idx = idx
+                header_end_idx = idx
         
-        # Return 1-based index
-        return header_idx + 1
+        # Scan upwards for merge count
+        merge_count = 1
+        current_idx = header_end_idx - 1
+        while current_idx >= 0:
+            if df.iloc[current_idx].count() > 0:
+                merge_count += 1
+                current_idx -= 1
+            else:
+                break
+        
+        return header_end_idx + 1, merge_count
         
     except Exception as e:
         print(f"Warning: Could not auto-detect header for sheet '{sheet_name}': {e}. Defaulting to row 1.")
-        return 1
+        return 1, 1
 
 def generate_config(input_file: str, output_config_file: str) -> None:
     """
@@ -104,11 +178,10 @@ def generate_config(input_file: str, output_config_file: str) -> None:
         print("-" * 40)
         print(f"analyzing sheet: '{sheet_name}'")
 
-        # Auto-detect header
-        header_num = detect_header_row(input_file, sheet_name)
+        # Auto-detect header and merge count
+        header_num, merge_rows_count = detect_header_and_merge_count(input_file, sheet_name)
         
         # Default values for simplified flow
-        merge_rows_count = 1
         excluded_rows = []
 
         config_data["sheets"][sheet_name] = {
@@ -116,7 +189,7 @@ def generate_config(input_file: str, output_config_file: str) -> None:
             "merge_rows": merge_rows_count,
             "excluded_rows": excluded_rows
         }
-        print(f"auto-detection complete: Header at row {header_num}.")
+        print(f"auto-detection complete: Header at row {header_num}, Merged {merge_rows_count} rows.")
 
     try:
         with open(output_config_file, 'w', encoding='utf-8') as f:

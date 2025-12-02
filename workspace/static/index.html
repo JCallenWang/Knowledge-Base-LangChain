@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Base SQL Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Upload Area -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>KB Agent</h1>
+                <span class="badge">SQL</span>
+            </div>
+            
+            <div class="upload-section">
+                <h2>Data Source</h2>
+                <div class="drop-zone" id="drop-zone">
+                    <div class="icon">📂</div>
+                    <p>Drag & Drop Excel File</p>
+                    <span>or click to browse</span>
+                    <input type="file" id="file-input" accept=".xlsx, .xls" hidden>
+                </div>
+                <div class="file-status" id="file-status"></div>
+            </div>
+
+            <div class="info-panel">
+                <h3>Session Info</h3>
+                <div class="info-item">
+                    <span class="label">Status</span>
+                    <span class="value" id="status-indicator">Ready</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Database</span>
+                    <span class="value" id="db-name">-</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <div class="chat-header">
+                <h2>Query Assistant</h2>
+                <div class="actions">
+                    <button class="btn-icon" id="clear-chat" title="Clear Chat">🗑️</button>
+                </div>
+            </div>
+            
+            <div class="messages-area" id="messages-area">
+                <div class="message system">
+                    <div class="content">
+                        Welcome! Please upload an Excel file to start analyzing your data.
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="text" id="user-input" placeholder="Ask a question about your data..." disabled>
+                    <button id="send-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

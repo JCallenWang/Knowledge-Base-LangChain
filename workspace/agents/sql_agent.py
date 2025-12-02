@@ -14,7 +14,7 @@ import os
 import re
 import time
 import glob
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 from sqlalchemy.exc import OperationalError  
 
 from .utils_sql import PromptFactory, SQLAgentContext
@@ -80,30 +80,33 @@ def _parse_sql_query(raw_query: str) -> str:
     return raw_query.strip().strip('`').strip()
 
 
-def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
+def get_agent_chain(db_dir_path: str, additional_description: str) -> Tuple[Runnable, bool, List[str]]:
     """
-    Initializes and starts the SQL agent, which can handle either a single database file
-    or a directory of databases.
+    Initializes the SQL agent chain.
 
     Args:
         db_dir_path (str): The path to the database file or directory containing database files.
         additional_description (str): A description of the database schema or additional context for the agent.
 
     Returns:
-        None
+        Tuple[Runnable, bool, List[str]]: A tuple containing:
+            - The LangChain runnable chain.
+            - A boolean indicating if multiple databases are present.
+            - A list of database filenames.
     """
     llm, sqlm = init_model()
 
     if not os.path.exists(db_dir_path):
         print(f"Cannot find database path: {db_dir_path}")
-        exit(0)
+        # In a real app, might want to raise an exception
+        return None, False, []
 
     db_files = []
     if os.path.isdir(db_dir_path):
         db_files = glob.glob(os.path.join(db_dir_path, '*.db'))
         if not db_files:
             print(f"No .db files found in directory: {db_dir_path}")
-            exit(0)
+            return None, False, []
     elif os.path.isfile(db_dir_path):
         db_files = [db_dir_path]
     
@@ -111,17 +114,7 @@ def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
     db_connections: Dict[str, SQLDatabase] = {}
 
     def get_db_connection(db_file_path: str) -> SQLDatabase:
-        """
-        Retrieves or creates a connection to the specified SQLite database file.
-
-        Args:
-            db_file_path (str): The path to the database file.
-
-        Returns:
-            SQLDatabase: The LangChain SQLDatabase object for the given file.
-        """
         if db_file_path not in db_connections:
-            #print(f"\nConnecting to database: '{db_file_path}'")
             db_connections[db_file_path] = SQLDatabase.from_uri(
                 f"sqlite:///{db_file_path}",
                 sample_rows_in_table_info=1
@@ -129,15 +122,6 @@ def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
         return db_connections[db_file_path]
 
     def run_sql_query(context: SQLAgentContext) -> SQLAgentContext:
-        """
-        Executes the generated SQL query and handles errors with automatic retry/correction.
-
-        Args:
-            context (SQLAgentContext): The current execution context containing the query and database connection.
-
-        Returns:
-            SQLAgentContext: The updated context with the query execution result.
-        """
         query = context.query
         db = context.db
         
@@ -158,7 +142,6 @@ def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
                     | sqlm
                 )
                 
-                # The correction chain can now access 'llm' from the outer scope
                 query = correction_chain.invoke({
                     "input": context.user_input,
                     "db_schema": context.db_schema,
@@ -169,36 +152,6 @@ def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
 
         context.result = f"Error occurred when executing query: '{query}' with error: {str(e) if 'e' in locals() else 'Unknown error'}"
         return context
-
-    def start_query_system(chain: Runnable, is_multi_db: bool) -> None:
-        """
-        Starts the interactive command-line query loop.
-
-        Args:
-            chain (Runnable): The LangChain runnable chain to process user queries.
-            is_multi_db (bool): Indicates if multiple databases are available (enables database selection).
-
-        Returns:
-            None
-        """
-        while True:
-            user_input = input("(Enter 'bye'/'exit' to exit the query system) Enter a question: ") 
-            if user_input.lower() in ('bye', 'exit', 'clear'):
-                print("Thanks for using, bye!")
-                break
-
-            if user_input.strip():                
-                context = SQLAgentContext(
-                    user_input=user_input,
-                    schema_description=additional_description
-                )
-                if is_multi_db:
-                    context.db_names = [os.path.basename(f) for f in db_files]
-                
-                chain.invoke(context)
-                print("\n")
-            else:
-                print("Please enter a valid question!")
 
     # This chain selects the correct DB file path from a list of names
     db_router_chain = (
@@ -235,5 +188,45 @@ def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
         )
         | RunnableLambda(lambda ctx: print(f"\n[Debug][{time.time() - ctx.start_time:.2f}s] Final LLM Response: {ctx.final_response}") or ctx)
     )
+    
+    db_names = [os.path.basename(f) for f in db_files]
+    return db_chain, len(db_files) > 1, db_names
 
-    start_query_system(db_chain, is_multi_db=len(db_files) > 1)
+
+def start_sql_agent(db_dir_path: str, additional_description: str) -> None:
+    """
+    Initializes and starts the SQL agent interactive loop.
+
+    Args:
+        db_dir_path (str): The path to the database file or directory containing database files.
+        additional_description (str): A description of the database schema or additional context for the agent.
+
+    Returns:
+        None
+    """
+    chain, is_multi_db, db_names = get_agent_chain(db_dir_path, additional_description)
+    
+    if not chain:
+        return
+
+    def start_query_system(chain: Runnable, is_multi_db: bool, db_names: List[str]) -> None:
+        while True:
+            user_input = input("(Enter 'bye'/'exit' to exit the query system) Enter a question: ") 
+            if user_input.lower() in ('bye', 'exit', 'clear'):
+                print("Thanks for using, bye!")
+                break
+
+            if user_input.strip():                
+                context = SQLAgentContext(
+                    user_input=user_input,
+                    schema_description=additional_description
+                )
+                if is_multi_db:
+                    context.db_names = db_names
+                
+                chain.invoke(context)
+                print("\n")
+            else:
+                print("Please enter a valid question!")
+
+    start_query_system(chain, is_multi_db, db_names)

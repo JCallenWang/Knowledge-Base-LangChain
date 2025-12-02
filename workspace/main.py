@@ -92,7 +92,10 @@ def xlsx_to_sql_init(source_file: str) -> str:
     config_file = os.path.join(config_files_dir, f"{base_name}_config.json")
 
     staged_source_file = os.path.join(source_files_dir, os.path.basename(source_file))
-    shutil.copy(source_file, staged_source_file)
+    if os.path.abspath(source_file) != os.path.abspath(staged_source_file):
+        shutil.copy(source_file, staged_source_file)
+    else:
+        print(f"Source file is already in the target directory: {staged_source_file}")
 
     print("\nStep 1: Generating configuration file (Auto-Detection)...")
     generate_config(staged_source_file, config_file)
