@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar / Upload Area -->
@@ -17,8 +19,17 @@
                 <h1>KB Agent</h1>
                 <span class="badge">SQL</span>
             </div>
-            
-            <div class="upload-section">
+
+            <div class="nav-tabs">
+                <button class="nav-btn active" data-tab="chat">
+                    <span class="icon">💬</span> Chat
+                </button>
+                <button class="nav-btn" data-tab="management">
+                    <span class="icon">⚙️</span> Management
+                </button>
+            </div>
+
+            <div class="upload-section" id="upload-section">
                 <h2>Data Source</h2>
                 <div class="drop-zone" id="drop-zone">
                     <div class="icon">📂</div>
@@ -29,7 +40,7 @@
                 <div class="file-status" id="file-status"></div>
             </div>
 
-            <div class="info-panel">
+            <div class="info-panel" id="info-panel">
                 <h3>Session Info</h3>
                 <div class="info-item">
                     <span class="label">Status</span>
@@ -43,14 +54,14 @@
         </aside>
 
         <!-- Main Chat Area -->
-        <main class="chat-container">
+        <main class="main-content active" id="view-chat">
             <div class="chat-header">
                 <h2>Query Assistant</h2>
                 <div class="actions">
                     <button class="btn-icon" id="clear-chat" title="Clear Chat">🗑️</button>
                 </div>
             </div>
-            
+
             <div class="messages-area" id="messages-area">
                 <div class="message system">
                     <div class="content">
@@ -63,7 +74,8 @@
                 <div class="input-wrapper">
                     <input type="text" id="user-input" placeholder="Ask a question about your data..." disabled>
                     <button id="send-btn" disabled>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
                             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                         </svg>
@@ -71,7 +83,33 @@
                 </div>
             </div>
         </main>
+
+        <!-- Management Area -->
+        <main class="main-content" id="view-management">
+            <div class="chat-header">
+                <h2>Management</h2>
+            </div>
+
+            <div class="management-container">
+                <div class="section">
+                    <h3>Agent Instructions</h3>
+                    <p class="description">Define global instructions for the SQL Agent (e.g., language preference,
+                        column interpretations).</p>
+                    <textarea id="agent-instructions" placeholder="Enter instructions here..."></textarea>
+                    <button class="btn-primary" id="save-config-btn">Save Instructions</button>
+                </div>
+
+                <div class="section">
+                    <h3>Processed Datasets</h3>
+                    <p class="description">Manage previously processed Excel files.</p>
+                    <div class="file-list" id="file-list">
+                        <!-- File items will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
     <script src="app.js"></script>
 </body>
+
 </html>

@@ -9,7 +9,137 @@ document.addEventListener('DOMContentLoaded', () => {
     const messagesArea = document.getElementById('messages-area');
     const clearChatBtn = document.getElementById('clear-chat');
 
+    // Management Elements
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const views = document.querySelectorAll('.main-content');
+    const agentInstructions = document.getElementById('agent-instructions');
+    const saveConfigBtn = document.getElementById('save-config-btn');
+    const fileList = document.getElementById('file-list');
+
     let sessionId = null;
+
+    // Tab Navigation
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.dataset.tab;
+
+            // Update Buttons
+            navBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update Views
+            views.forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${tabName}`).classList.add('active');
+
+            // Load data if switching to management
+            if (tabName === 'management') {
+                loadInstructions();
+                loadFiles();
+            }
+        });
+    });
+
+    // Config Management
+    async function loadInstructions() {
+        try {
+            const response = await fetch('/config/instructions');
+            const data = await response.json();
+            agentInstructions.value = data.instructions;
+        } catch (error) {
+            console.error('Failed to load instructions:', error);
+        }
+    }
+
+    saveConfigBtn.addEventListener('click', async () => {
+        const instructions = agentInstructions.value;
+        try {
+            const response = await fetch('/config/instructions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instructions })
+            });
+
+            if (response.ok) {
+                alert('Instructions saved successfully!');
+            } else {
+                throw new Error('Failed to save');
+            }
+        } catch (error) {
+            alert('Error saving instructions: ' + error.message);
+        }
+    });
+
+    // File Management
+    async function loadFiles() {
+        try {
+            const response = await fetch('/files');
+            const data = await response.json();
+            renderFileList(data.files);
+        } catch (error) {
+            console.error('Failed to load files:', error);
+        }
+    }
+
+    function renderFileList(files) {
+        fileList.innerHTML = '';
+        if (files.length === 0) {
+            fileList.innerHTML = '<p style="color: var(--text-secondary);">No processed datasets found.</p>';
+            return;
+        }
+
+        files.forEach(file => {
+            const card = document.createElement('div');
+            card.className = 'file-card';
+
+            // Extract clean name (remove hash suffix if possible)
+            // Format: name_hash
+            let displayName = file;
+            if (file.includes('_')) {
+                const parts = file.split('_');
+                if (parts.length > 1 && parts[parts.length - 1].length === 8) {
+                    displayName = parts.slice(0, -1).join('_');
+                }
+            }
+
+            card.innerHTML = `
+                <div class="file-info">
+                    <span class="file-icon">📊</span>
+                    <span class="file-name" title="${file}">${displayName}</span>
+                </div>
+                <button class="btn-delete" title="Delete Dataset" data-folder="${file}">
+                    🗑️
+                </button>
+            `;
+            fileList.appendChild(card);
+        });
+
+        // Add delete listeners
+        document.querySelectorAll('.btn-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const folder = e.currentTarget.dataset.folder;
+                if (confirm(`Are you sure you want to delete "${folder}"? This cannot be undone.`)) {
+                    deleteFile(folder);
+                }
+            });
+        });
+    }
+
+    async function deleteFile(folderName) {
+        try {
+            const response = await fetch(`/files/${folderName}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                loadFiles(); // Refresh list
+            } else {
+                const error = await response.json();
+                alert('Failed to delete: ' + error.detail);
+            }
+        } catch (error) {
+            alert('Error deleting file: ' + error.message);
+        }
+    }
 
     // Drag & Drop Handlers
     dropZone.addEventListener('click', () => fileInput.click());

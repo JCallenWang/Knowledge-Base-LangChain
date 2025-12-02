@@ -169,7 +169,7 @@ def get_agent_chain(db_dir_path: str, additional_description: str) -> Tuple[Runn
         | RunnableLambda(lambda ctx: setattr(ctx, 'db_schema', ctx.db.get_table_info()) or ctx)
         | RunnableLambda(
             lambda ctx: setattr(ctx, 'query', (
-                    RunnableLambda(lambda c: {"input": c.user_input, "db_schema": c.db_schema, "schema_description": c.schema_description})
+                    RunnableLambda(lambda c: print(f"\n[Debug] Instructions: {c.schema_description}") or {"input": c.user_input, "db_schema": c.db_schema, "schema_description": c.schema_description})
                     | PromptFactory.create_sql_generation_prompt()
                     | sqlm
                 ).invoke(ctx)
