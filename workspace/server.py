@@ -56,7 +56,7 @@ async def upload_file(file: UploadFile = File(...), header_mode: str = Form("row
             shutil.copyfileobj(file.file, buffer)
             
         # Process the file
-        db_path = xlsx_to_sql_init(file_path, header_mode)
+        db_path = xlsx_to_sql_init(file_path, header_mode, force_reprocess=True)
         
         # Get instructions from config
         instructions = get_agent_instructions()

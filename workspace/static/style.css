@@ -239,6 +239,12 @@ textarea:focus {
     background-color: var(--accent-hover);
 }
 
+.btn-primary:disabled {
+    background-color: var(--bg-tertiary);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 /* File List */
 .file-list {
     display: grid;

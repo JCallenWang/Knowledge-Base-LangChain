@@ -182,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     processBtn.addEventListener('click', () => {
+        if (processBtn.disabled) return;
         if (selectedFile) {
             handleFileUpload(selectedFile);
         }
@@ -226,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus(`Error: ${error.message}`, 'error');
             statusIndicator.textContent = 'Error';
             statusIndicator.style.color = '#ef4444';
+        } finally {
             processBtn.disabled = false;
         }
     }

@@ -49,7 +49,7 @@ def get_file_hash(file_path: str) -> str:
         print(f"An error occurred while hashing the file: {e}")
         sys.exit(1)
 
-def xlsx_to_sql_init(source_file: str, header_mode: str = "row") -> str:
+def xlsx_to_sql_init(source_file: str, header_mode: str = "row", force_reprocess: bool = False) -> str:
     """
     Converts an Excel file to a SQL database through a series of processing steps.
 
@@ -62,6 +62,7 @@ def xlsx_to_sql_init(source_file: str, header_mode: str = "row") -> str:
     Args:
         source_file (str): The path to the source .xlsx file.
         header_mode (str): "row" or "column". Defaults to "row".
+        force_reprocess (bool): If True, delete existing artifacts and reprocess.
 
     Returns:
         str: The path to the directory containing the generated database(s).
@@ -78,6 +79,10 @@ def xlsx_to_sql_init(source_file: str, header_mode: str = "row") -> str:
     config_files_dir = os.path.join(root_output_dir, "config")
     # processed_data_dir is no longer needed in the simplified flow
     database_dir = os.path.join(root_output_dir, "database")
+
+    if os.path.isdir(root_output_dir) and force_reprocess:
+        print(f"Force reprocess enabled. Removing existing directory: '{root_output_dir}'")
+        shutil.rmtree(root_output_dir)
 
     if os.path.isdir(database_dir) and glob.glob(os.path.join(database_dir, '*.db')):
         print(f"Database files already exist in '{database_dir}'. Skipping generation.")
