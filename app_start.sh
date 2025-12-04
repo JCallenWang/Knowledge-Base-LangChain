@@ -38,9 +38,11 @@ first_run() {
     echo "Pulling model gemma3:27b..."
     docker exec -it "$CONTAINER_NAME" ollama pull gemma3:27b
 
-    # 5. Enter Container
-    echo "Entering container $CONTAINER_NAME..."
-    docker exec -it "$CONTAINER_NAME" bash
+    # 5. Start Web Service
+    echo "Starting Web Service..."
+    echo "Access the UI at: http://localhost:8000/static/index.html"
+    echo "Press Ctrl+C to stop the server and return to menu."
+    docker exec -it "$CONTAINER_NAME" python3 -u server.py
 }
 
 resume_run() {
@@ -69,9 +71,11 @@ resume_run() {
         sleep 2
     done
 
-    # 4. Enter
-    echo "Entering container $CONTAINER_NAME..."
-    docker exec -it "$CONTAINER_NAME" bash
+    # 4. Start Web Service
+    echo "Starting Web Service..."
+    echo "Access the UI at: http://localhost:8000/static/index.html"
+    echo "Press Ctrl+C to stop the server and return to menu."
+    docker exec -it "$CONTAINER_NAME" python3 -u server.py
 }
 
 stop_container() {
@@ -98,8 +102,8 @@ while true; do
     echo
 
     OPTIONS=(
-        "Setup & Start (Build, Start, Pull Model, Enter)"
-        "Resume (Start if needed, Enter)"
+        "Setup & Start (Build, Start, Pull Model, Web Service)"
+        "Resume (Start if needed, Web Service)"
         "Stop Container"
         "Exit"
     )

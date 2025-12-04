@@ -34,21 +34,34 @@ The main goal of this project is to streamline the process of querying data stor
     ```
 
     Follow the interactive menu:
-    *   Select **First Run** for the initial setup.
-    *   Select **Resume** if you have already set it up and want to restart the container.
+    *   Select **Setup & Start (Build, Start, Pull Model, Web Service)** for the initial setup.
+    *   Select **Resume (Start if needed, Web Service)** if you have already set it up and want to restart the container.
+    *   Select **Stop Container** to stop the running container.
+    *   Select **Exit** to leave the script.
 
 ## Usage
 
 Once you are inside the Docker container, you can run the main application to process an Excel file and start the agent.
 
-### Running the Agent
+### Running the Web Interface
 
-Navigate to the `workspace` directory and run `main.py` with your Excel file as an argument:
+You can also interact with the agent via a Web UI.
 
-```bash
-cd workspace
-python main.py source/Financial\ Sample.xlsx
-```
+1.  **Start the Server**:
+    Inside the container, run:
+    ```bash
+    cd workspace
+    python server.py
+    ```
+
+2.  **Access the UI**:
+    Open your browser and navigate to:
+    `http://localhost:8000/static/index.html`
+
+    From the UI, you can:
+    *   Upload Excel files.
+    *   Chat with the SQL Agent.
+    *   Manage uploaded datasets.
 
 ### Workflow Description
 
@@ -61,7 +74,7 @@ The `main.py` script orchestrates the following steps:
 
 2.  **Data Processing**:
     *   Based on the configuration, it cleans the data (removes empty columns, handles merged headers).
-    *   It converts the data into JSON Lines (`.jsonl`) format.
+    *   It converts the data into Pandas DataFrames.
 
 3.  **Database Initialization**:
     *   It creates a SQLite database (`.db`) for each processed sheet.
@@ -72,24 +85,3 @@ The `main.py` script orchestrates the following steps:
     *   You can ask questions in natural language (e.g., "What is the total profit for Government segment?").
     *   The agent translates your question into SQL, executes it, and provides a natural language answer.
 
-### Interactive Query System
-
-When the agent starts, you will see a prompt:
-```text
-(Enter 'bye'/'exit' to exit the query system) Enter a question:
-```
-Simply type your question and press Enter.
-
-## Project Structure
-
-*   `workspace/`: Contains the source code and working directories.
-    *   `main.py`: The entry point script.
-    *   `agents/`: Contains the Logic for the SQL Agent and LangChain integration.
-    *   `data_initiation/`: Handles SQLite database creation.
-    *   `data_preprocessing/`: Handles Excel parsing and cleaning.
-*   `app_start.sh`: Helper script for Docker management.
-*   `dockerfile/`: Docker configuration files.
-
-## Documentation
-
-All source code files are fully documented with docstrings adhering to Google Style Python Docstrings.
