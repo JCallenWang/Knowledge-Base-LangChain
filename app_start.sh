@@ -1,15 +1,11 @@
 #!/bin/bash
 
 CONTAINER_NAME="fc-rag-dev-v3"
-REPO_URL="https://github.com/JCallenWang/Knowledge-Base-LangChain.git"
-DIR_NAME="Knowledge-Base-LangChain"
 DOCKER_DIR="dockerfile/stage"
 
 # Helper to navigate to docker directory
 check_and_cd_docker_dir() {
-    if [ -d "$DIR_NAME/$DOCKER_DIR" ]; then
-        cd "$DIR_NAME/$DOCKER_DIR" || return 1
-    elif [ -d "$DOCKER_DIR" ]; then
+    if [ -d "$DOCKER_DIR" ]; then
         cd "$DOCKER_DIR" || return 1
     else
         return 1
@@ -17,17 +13,10 @@ check_and_cd_docker_dir() {
 }
 
 first_run() {
-    # 1. Clone repo if not exists
-    if [ -d "$DIR_NAME" ]; then
-        echo "Directory '$DIR_NAME' already exists. Skipping clone."
-    else
-        echo "Cloning $REPO_URL..."
-        git clone "$REPO_URL"
-    fi
-
     # Navigate to docker directory
     if ! check_and_cd_docker_dir; then
-        echo "Error: Cannot find docker directory after clone."
+        echo "Error: Cannot find docker directory '$DOCKER_DIR'."
+        echo "Please ensure you are running this script from the project root."
         read -n 1 -s -r -p "Press any key to return to menu..."
         return
     fi
@@ -57,8 +46,8 @@ first_run() {
 resume_run() {
     # 1. Check if project directory exists
     if ! check_and_cd_docker_dir; then
-        echo "Error: Project directory not found."
-        echo "Please select 'First Run' to clone and setup the environment."
+        echo "Error: Docker directory not found."
+        echo "Please ensure you are running this script from the project root."
         read -n 1 -s -r -p "Press any key to return to menu..."
         return
     fi
@@ -109,7 +98,7 @@ while true; do
     echo
 
     OPTIONS=(
-        "First Run (Clone, Build, Start, Pull Model, Enter)"
+        "Setup & Start (Build, Start, Pull Model, Enter)"
         "Resume (Start if needed, Enter)"
         "Stop Container"
         "Exit"
