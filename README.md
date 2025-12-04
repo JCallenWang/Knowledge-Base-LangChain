@@ -27,7 +27,7 @@ The main goal of this project is to streamline the process of querying data stor
     Use the provided `app_start.sh` script to set up the environment. This script handles:
     *   Building and starting the Docker container.
     *   Pulling the necessary LLM model (e.g., `gemma3:27b`) via Ollama.
-    *   Entering the container environment.
+    *   Start web service.
 
     ```bash
     ./app_start.sh
@@ -41,47 +41,7 @@ The main goal of this project is to streamline the process of querying data stor
 
 ## Usage
 
-Once you are inside the Docker container, you can run the main application to process an Excel file and start the agent.
+You can interact with the agent via a Web UI.
 
-### Running the Web Interface
-
-You can also interact with the agent via a Web UI.
-
-1.  **Start the Server**:
-    Inside the container, run:
-    ```bash
-    cd workspace
-    python server.py
-    ```
-
-2.  **Access the UI**:
-    Open your browser and navigate to:
-    `http://localhost:8000/static/index.html`
-
-    From the UI, you can:
-    *   Upload Excel files.
-    *   Chat with the SQL Agent.
-    *   Manage uploaded datasets.
-
-### Workflow Description
-
-The `main.py` script orchestrates the following steps:
-
-1.  **Configuration Generation**:
-    *   It scans the Excel file and detects sheets.
-    *   It prompts you to define the header rows and any rows to exclude.
-    *   A configuration JSON file is generated.
-
-2.  **Data Processing**:
-    *   Based on the configuration, it cleans the data (removes empty columns, handles merged headers).
-    *   It converts the data into Pandas DataFrames.
-
-3.  **Database Initialization**:
-    *   It creates a SQLite database (`.db`) for each processed sheet.
-    *   It infers data types and populates the tables.
-
-4.  **SQL Agent Interaction**:
-    *   The SQL Agent starts and connects to the generated database(s).
-    *   You can ask questions in natural language (e.g., "What is the total profit for Government segment?").
-    *   The agent translates your question into SQL, executes it, and provides a natural language answer.
-
+**Access the UI**:
+Open your browser and navigate to `http://localhost:8000/static/index.html`
