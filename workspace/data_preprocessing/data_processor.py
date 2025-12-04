@@ -91,7 +91,7 @@ def _parse_excluded_rows(excluded_rows_config: List[Union[int, str]]) -> Set[int
                 print(f"Warning: Could not parse range '{item}' in excluded_rows. Skipping.")
     return excluded
 
-def _load_and_clean_sheet(input_file: str, sheet_name: str, header_config: Dict[str, Any]) -> Tuple[Optional[pd.DataFrame], str]:
+def _load_and_clean_sheet(input_file: str, sheet_name: str, header_config: Dict[str, Any], header_mode: str = "row") -> Tuple[Optional[pd.DataFrame], str]:
     """
     Loads an Excel sheet and applies cleaning operations such as removing empty columns,
     processing headers, and excluding specified rows.
@@ -100,6 +100,7 @@ def _load_and_clean_sheet(input_file: str, sheet_name: str, header_config: Dict[
         input_file (str): The path to the Excel file.
         sheet_name (str): The name of the sheet to process.
         header_config (Dict[str, Any]): Configuration dictionary containing 'header_row', 'merge_rows', and 'excluded_rows'.
+        header_mode (str): "row" or "column".
 
     Returns:
         Tuple[Optional[pd.DataFrame], str]: A tuple containing the cleaned DataFrame and a metadata string.
@@ -108,42 +109,97 @@ def _load_and_clean_sheet(input_file: str, sheet_name: str, header_config: Dict[
     header_num = header_config['header_row']
     merge_rows_count = header_config['merge_rows']
     excluded_rows = header_config.get('excluded_rows', [])
-    print(f"\n--- process sheet: {sheet_name} (Header Row ends:{header_num}, merged rows count: {merge_rows_count} ) ---")
+    print(f"\n--- process sheet: {sheet_name} (Header ends:{header_num}, merged count: {merge_rows_count}, Mode: {header_mode}) ---")
     header_index = header_num - 1
 
     try:
-        if header_num > merge_rows_count:
-            df, df_pre_header = load_data_from_sheet(
-                input_file, sheet_name, header_index, merge_rows_count
-            )
-            is_metadata_present = True
-            print("datas before header have override default Metadata.")
+        if header_mode == "column":
+             # Read entire sheet without header
+             df_raw = pd.read_excel(input_file, sheet_name=sheet_name, header=None, engine='openpyxl')
+             # Transpose
+             df_transposed = df_raw.T.reset_index(drop=True)
+             
+             # Apply header logic on transposed data
+             if header_num > merge_rows_count:
+                 # Metadata exists
+                 header_indices = list(range(header_index - merge_rows_count + 1, header_index + 1))
+                 before_header_rows_count = header_indices[0]
+                 
+                 df_pre_header = df_transposed.iloc[:before_header_rows_count].copy()
+                 df_main = df_transposed.iloc[header_index + 1:].copy()
+                 
+                 # Set header
+                 header_rows_df = df_transposed.iloc[header_indices]
+                 if merge_rows_count > 1:
+                     new_columns = []
+                     for col_idx in range(header_rows_df.shape[1]):
+                         col_vals = header_rows_df.iloc[:, col_idx]
+                         col_name = ' - '.join([str(v).strip() for v in col_vals if pd.notna(v) and str(v).strip()])
+                         new_columns.append(col_name)
+                     df_main.columns = new_columns
+                 else:
+                     df_main.columns = header_rows_df.iloc[0].astype(str)
+                 
+                 is_metadata_present = True
+                 print("datas before header have override default Metadata (Column Mode).")
+                 
+             else:
+                 # No metadata
+                 header_indices = list(range(header_index - merge_rows_count + 1, header_index + 1))
+                 
+                 df_main = df_transposed.iloc[header_index + 1:].copy()
+                 
+                 header_rows_df = df_transposed.iloc[header_indices]
+                 if merge_rows_count > 1:
+                     new_columns = []
+                     for col_idx in range(header_rows_df.shape[1]):
+                         col_vals = header_rows_df.iloc[:, col_idx]
+                         col_name = ' - '.join([str(v).strip() for v in col_vals if pd.notna(v) and str(v).strip()])
+                         new_columns.append(col_name)
+                     df_main.columns = new_columns
+                 else:
+                     df_main.columns = header_rows_df.iloc[0].astype(str)
+                     
+                 df_pre_header = pd.DataFrame()
+                 is_metadata_present = False
+                 print("using default Metadata (Column Mode).")
+                 
+             df = df_main
+             
         else:
-            df, _ = load_data_from_sheet(
-                input_file, sheet_name, header_index, merge_rows_count
-            )
-            df_pre_header = pd.DataFrame()
-            is_metadata_present = False
-            print("using default Metadata.")
+            if header_num > merge_rows_count:
+                df, df_pre_header = load_data_from_sheet(
+                    input_file, sheet_name, header_index, merge_rows_count
+                )
+                is_metadata_present = True
+                print("datas before header have override default Metadata.")
+            else:
+                df, _ = load_data_from_sheet(
+                    input_file, sheet_name, header_index, merge_rows_count
+                )
+                df_pre_header = pd.DataFrame()
+                is_metadata_present = False
+                print("using default Metadata.")
 
     except Exception as e:
         print(f"loading data failed: {e}")
         return None, None
 
-    temp_kwargs = {'header': None, 'nrows': header_num, 'engine': 'openpyxl', 'sheet_name': sheet_name}
-    df_header_block = pd.read_excel(input_file, **temp_kwargs)
-    cols_to_drop_indices = df_header_block.columns[df_header_block.isna().all()].tolist()
-    if cols_to_drop_indices:
-        print(f"cleaning Metadata/Header block: detect {len(cols_to_drop_indices)} empty columns (index: {cols_to_drop_indices}).")
+    if header_mode == 'row':
+        temp_kwargs = {'header': None, 'nrows': header_num, 'engine': 'openpyxl', 'sheet_name': sheet_name}
+        df_header_block = pd.read_excel(input_file, **temp_kwargs)
+        cols_to_drop_indices = df_header_block.columns[df_header_block.isna().all()].tolist()
+        if cols_to_drop_indices:
+            print(f"cleaning Metadata/Header block: detect {len(cols_to_drop_indices)} empty columns (index: {cols_to_drop_indices}).")
 
-        if is_metadata_present and not df_pre_header.empty:
-            all_cols_indices = df_pre_header.columns.tolist()
-            cols_to_keep_indices = [col for col in all_cols_indices if col not in cols_to_drop_indices]
+            if is_metadata_present and not df_pre_header.empty:
+                all_cols_indices = df_pre_header.columns.tolist()
+                cols_to_keep_indices = [col for col in all_cols_indices if col not in cols_to_drop_indices]
 
-            df_pre_header = df_pre_header.iloc[:, cols_to_keep_indices]
-            print(f"cleaning Metadata: remove {len(cols_to_drop_indices)} columns successfully.")
-    else:
-        print("Metadata/Header block donnot have empty field.")
+                df_pre_header = df_pre_header.iloc[:, cols_to_keep_indices]
+                print(f"cleaning Metadata: remove {len(cols_to_drop_indices)} columns successfully.")
+        else:
+            print("Metadata/Header block donnot have empty field.")
 
     df.columns = df.columns.astype(str)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed:')]
@@ -288,6 +344,7 @@ def load_dataframes_from_config(config_file: str) -> Dict[str, pd.DataFrame]:
         return {}
 
     input_file = config_data.get("input_file")
+    header_mode = config_data.get("header_mode", "row")
     sheets_config = config_data.get("sheets", {})
 
     if not input_file or not sheets_config:
@@ -296,6 +353,7 @@ def load_dataframes_from_config(config_file: str) -> Dict[str, pd.DataFrame]:
 
     sheet_names = list(sheets_config.keys())
     print(f"source file: {input_file}")
+    print(f"header mode: {header_mode}")
     print(f"total sheet count: {len(sheet_names)}, output as DataFrames")
 
     processed_dfs = {}
@@ -305,7 +363,7 @@ def load_dataframes_from_config(config_file: str) -> Dict[str, pd.DataFrame]:
             header_config = sheets_config[sheet_name]
             
             # Load and clean the sheet
-            df, metadata_string = _load_and_clean_sheet(input_file, sheet_name, header_config)
+            df, metadata_string = _load_and_clean_sheet(input_file, sheet_name, header_config, header_mode)
 
             if df is None or df.empty:
                 print(f"sheet '{sheet_name}' is empty or failed to load.")

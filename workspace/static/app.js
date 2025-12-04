@@ -141,6 +141,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const processBtn = document.getElementById('process-btn');
+    let selectedFile = null;
+
     // Drag & Drop Handlers
     dropZone.addEventListener('click', () => fileInput.click());
 
@@ -158,28 +161,44 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.classList.remove('dragover');
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            handleFileUpload(files[0]);
+            selectFile(files[0]);
         }
     });
 
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
-            handleFileUpload(e.target.files[0]);
+            selectFile(e.target.files[0]);
         }
     });
 
-    async function handleFileUpload(file) {
+    function selectFile(file) {
         if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
             showStatus('Invalid file format. Please upload Excel file.', 'error');
             return;
         }
+        selectedFile = file;
+        showStatus(`Selected: ${file.name}`, 'info');
+        processBtn.disabled = false;
+    }
 
+    processBtn.addEventListener('click', () => {
+        if (selectedFile) {
+            handleFileUpload(selectedFile);
+        }
+    });
+
+    async function handleFileUpload(file) {
         showStatus('Uploading and processing...', 'info');
         statusIndicator.textContent = 'Processing...';
         statusIndicator.style.color = '#fbbf24'; // Warning color
+        processBtn.disabled = true;
 
         const formData = new FormData();
         formData.append('file', file);
+
+        // Get selected header mode
+        const headerMode = document.querySelector('input[name="header-mode"]:checked').value;
+        formData.append('header_mode', headerMode);
 
         try {
             const response = await fetch('/upload', {
@@ -207,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus(`Error: ${error.message}`, 'error');
             statusIndicator.textContent = 'Error';
             statusIndicator.style.color = '#ef4444';
+            processBtn.disabled = false;
         }
     }
 

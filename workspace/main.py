@@ -49,7 +49,7 @@ def get_file_hash(file_path: str) -> str:
         print(f"An error occurred while hashing the file: {e}")
         sys.exit(1)
 
-def xlsx_to_sql_init(source_file: str) -> str:
+def xlsx_to_sql_init(source_file: str, header_mode: str = "row") -> str:
     """
     Converts an Excel file to a SQL database through a series of processing steps.
 
@@ -61,6 +61,7 @@ def xlsx_to_sql_init(source_file: str) -> str:
 
     Args:
         source_file (str): The path to the source .xlsx file.
+        header_mode (str): "row" or "column". Defaults to "row".
 
     Returns:
         str: The path to the directory containing the generated database(s).
@@ -98,7 +99,7 @@ def xlsx_to_sql_init(source_file: str) -> str:
         print(f"Source file is already in the target directory: {staged_source_file}")
 
     print("\nStep 1: Generating configuration file (Auto-Detection)...")
-    generate_config(staged_source_file, config_file)
+    generate_config(staged_source_file, config_file, header_mode)
 
     print("\nStep 2: Loading data into DataFrames...")
     dfs = load_dataframes_from_config(config_file)

@@ -4,7 +4,7 @@ import uuid
 import json
 import glob
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -40,7 +40,7 @@ def get_agent_instructions() -> str:
     return ""
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), header_mode: str = Form("row")):
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload .xlsx or .xls")
 
@@ -56,7 +56,7 @@ async def upload_file(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
             
         # Process the file
-        db_path = xlsx_to_sql_init(file_path)
+        db_path = xlsx_to_sql_init(file_path, header_mode)
         
         # Get instructions from config
         instructions = get_agent_instructions()

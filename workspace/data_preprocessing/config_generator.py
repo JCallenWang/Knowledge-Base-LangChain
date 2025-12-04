@@ -146,13 +146,14 @@ def detect_header_and_merge_count(input_file: str, sheet_name: str, max_scan_row
         print(f"Warning: Could not auto-detect header for sheet '{sheet_name}': {e}. Defaulting to row 1.")
         return 1, 1
 
-def generate_config(input_file: str, output_config_file: str) -> None:
+def generate_config(input_file: str, output_config_file: str, header_mode: str = "row") -> None:
     """
     Generates a configuration file for the specified input Excel file using automatic detection.
 
     Args:
         input_file (str): The path to the input Excel file.
         output_config_file (str): The path where the generated JSON configuration will be saved.
+        header_mode (str): "row" or "column".
 
     Returns:
         None
@@ -171,6 +172,7 @@ def generate_config(input_file: str, output_config_file: str) -> None:
 
     config_data = {
         "input_file": input_file,
+        "header_mode": header_mode,
         "sheets": {}
     }
 
@@ -178,8 +180,14 @@ def generate_config(input_file: str, output_config_file: str) -> None:
         print("-" * 40)
         print(f"analyzing sheet: '{sheet_name}'")
 
-        # Auto-detect header and merge count
-        header_num, merge_rows_count = detect_header_and_merge_count(input_file, sheet_name)
+        if header_mode == "column":
+             # Skip row-based detection for column mode, assume first column (now row 1 after transpose) is header
+             header_num = 1
+             merge_rows_count = 1
+             print(f"Header Mode is 'column'. Skipping row detection. Defaulting to Header at row 1 (after transpose).")
+        else:
+            # Auto-detect header and merge count
+            header_num, merge_rows_count = detect_header_and_merge_count(input_file, sheet_name)
         
         # Default values for simplified flow
         excluded_rows = []
