@@ -5,8 +5,8 @@ services:
   # service name
   ollama-langchain:
     # image name
-    image: fc-langchain-rag:v0.1.5
-    container_name: fc-rag-dev-v3
+    image: fc-langchain-rag:v0.1.6
+    container_name: fc-rag-stg
     build:
       context: .
       dockerfile: Dockerfile.stg
@@ -16,18 +16,23 @@ services:
     volumes:
       - ../../workspace:/workspace
       - ollama:/root/.ollama
-    # below only work in Docker Swarm mode
-    #deploy:
-    #  resources:
-    #    reservations:
-    #      devices:
-    #        - driver: nvidia
-    #          count: all
-    #        - capabilities: [gpu]
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "unixgram:///dev/log" # sent Log to localhost's Syslog Socket
+        tag: "{{.Name}}"  # identify container with tag {{.Name}} for container's name
+        syslog-format: "rfc3164" # (Opt.) set Log format
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all          # specify counts(ex. 1)
+              capabilities: [gpu]
+              
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - OLLAMA_HOST=0.0.0.0
-    runtime: nvidia
     #tty: true
     #stdin_open: true
 
