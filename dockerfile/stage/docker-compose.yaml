@@ -34,6 +34,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - OLLAMA_HOST=0.0.0.0
       - PYTHONUNBUFFERED=1
+    #  - ANSI_COLORS_DISABLED=1   # disable color output
     #tty: true
     #stdin_open: true
 

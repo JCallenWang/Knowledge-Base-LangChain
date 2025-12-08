@@ -55,7 +55,7 @@ first_run() {
     echo "Starting Web Service..."
     echo "Access the UI at: http://localhost:8000/static/index.html"
     echo "Press Ctrl+C to stop the server and return to menu."
-    docker exec -it "$CONTAINER_NAME" sh -c 'python3 -u server.py 2>&1 | tee /proc/1/fd/1'
+    docker exec -it "$CONTAINER_NAME" sh -c 'stdbuf -oL -eL python3 -u server.py 2>&1 | stdbuf -oL -eL tee /proc/1/fd/1'
 }
 
 resume_run() {
@@ -101,7 +101,7 @@ resume_run() {
     echo "Starting Web Service..."
     echo "Access the UI at: http://localhost:8000/static/index.html"
     echo "Press Ctrl+C to stop the server and return to menu."
-    docker exec -it "$CONTAINER_NAME" sh -c 'python3 -u server.py 2>&1 | tee /proc/1/fd/1'
+    docker exec -it "$CONTAINER_NAME" sh -c 'stdbuf -oL -eL python3 -u server.py 2>&1 | stdbuf -oL -eL tee /proc/1/fd/1'
 }
 
 stop_container() {
