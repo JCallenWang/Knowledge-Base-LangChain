@@ -33,6 +33,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - OLLAMA_HOST=0.0.0.0
+      - PYTHONUNBUFFERED=1
     #tty: true
     #stdin_open: true
 

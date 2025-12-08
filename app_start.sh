@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONTAINER_NAME="fc-rag-dev-v3"
+CONTAINER_NAME="fc-rag-stg"
 DOCKER_DIR="dockerfile/stage"
 
 # Helper to navigate to docker directory
@@ -30,9 +30,22 @@ first_run() {
 
     # 3. Wait for Ollama
     echo "Waiting for Ollama service to be ready..."
+    local retries=0
+    local max_retries=30
     until docker exec "$CONTAINER_NAME" ollama list > /dev/null 2>&1; do
+        ((retries++))
+        if [ $retries -ge $max_retries ]; then
+            echo
+            echo "Error: Timed out waiting for Ollama service."
+            echo "Checking container logs for details:"
+            docker logs "$CONTAINER_NAME" | tail -n 10
+            return 1
+        fi
+        echo -n "."
         sleep 2
     done
+    echo
+    echo "Ollama service is ready."
 
     # 4. Pull Model
     echo "Pulling model gemma3:27b..."
@@ -42,7 +55,7 @@ first_run() {
     echo "Starting Web Service..."
     echo "Access the UI at: http://localhost:8000/static/index.html"
     echo "Press Ctrl+C to stop the server and return to menu."
-    docker exec -it "$CONTAINER_NAME" python3 -u server.py
+    docker exec -it "$CONTAINER_NAME" sh -c 'python3 -u server.py 2>&1 | tee /proc/1/fd/1'
 }
 
 resume_run() {
@@ -67,15 +80,28 @@ resume_run() {
 
     # 3. Wait for Ollama
     echo "Waiting for Ollama service to be ready..."
+    local retries=0
+    local max_retries=30
     until docker exec "$CONTAINER_NAME" ollama list > /dev/null 2>&1; do
+        ((retries++))
+        if [ $retries -ge $max_retries ]; then
+            echo
+            echo "Error: Timed out waiting for Ollama service."
+            echo "Checking container logs for details:"
+            docker logs "$CONTAINER_NAME" | tail -n 10
+            return 1
+        fi
+        echo -n "."
         sleep 2
     done
+    echo
+    echo "Ollama service is ready."
 
     # 4. Start Web Service
     echo "Starting Web Service..."
     echo "Access the UI at: http://localhost:8000/static/index.html"
     echo "Press Ctrl+C to stop the server and return to menu."
-    docker exec -it "$CONTAINER_NAME" python3 -u server.py
+    docker exec -it "$CONTAINER_NAME" sh -c 'python3 -u server.py 2>&1 | tee /proc/1/fd/1'
 }
 
 stop_container() {

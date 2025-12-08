@@ -3,6 +3,7 @@ FROM ollama/ollama:latest
 
 # Set using default settings for "apt-get install" pop-up 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
 # ISO operating commands
 RUN apt-get update && apt-get install -y --no-install-recommends \
